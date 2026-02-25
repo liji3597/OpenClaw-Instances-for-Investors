@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp______heng",
+      "Bash(grep:*)",
+      "Bash(claude mcp list:*)"
+    ]
+  }
+}
