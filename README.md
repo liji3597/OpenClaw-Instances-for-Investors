@@ -614,5 +614,5 @@ MIT License — 详见 [LICENSE](LICENSE) 文件。
 <p align="center">
   <strong>Built with ❤️ for the Solana community</strong>
   <br>
-  <a href="https://github.com/jeseli689">GitHub</a> · <a href="https://twitter.com/liji_1357">Twitter</a> · <a href="https://t.me/liji_1357">Telegram</a>
+  <a href="https://github.com/liji3597">GitHub</a> · <a href="https://twitter.com/liji_1357">Twitter</a> · <a href="https://t.me/liji_1357">Telegram</a>
 </p>

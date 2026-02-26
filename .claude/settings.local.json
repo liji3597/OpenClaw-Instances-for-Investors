@@ -1,9 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "mcp______heng",
+      "Mcp______heng",
       "Bash(grep:*)",
-      "Bash(claude mcp list:*)"
+      "Bash(claude mcp list:*)",
+      "mcp__grok__chat_completion",
+      "Bash(ls:*)",
+      "Bash(/d/MCP/hengjing/target/release/恒境.exe:*)",
+      "WebFetch(domain:github.com)",
+      "mcp______heng",
+      "mcp__exa__get_code_context_exa"
     ]
   }
 }
