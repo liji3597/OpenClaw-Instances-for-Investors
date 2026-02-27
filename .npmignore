@@ -1,0 +1,11 @@
+# Source code (kept in src/ but not needed in npm package)
+src/
+node_modules/
+data/
+.env
+.git/
+.gitignore
+*.md
+!README.md
+!AGENTS.md
+report .md

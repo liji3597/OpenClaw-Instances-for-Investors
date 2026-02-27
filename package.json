@@ -1,31 +1,54 @@
 {
   "name": "openclaw-investor-suite",
-  "version": "1.0.0",
-  "description": "Managed AI Investment Assistant for Solana — zero-barrier portfolio management via OpenClaw Gateway Skills",
+  "version": "1.0.1",
+  "description": "Solana AI Investment Assistant Skills for OpenClaw — portfolio tracking, DCA strategies, price alerts & market intelligence",
+  "bin": {
+    "openclaw-investor-setup": "./bin/setup.js"
+  },
   "scripts": {
+    "postinstall": "node bin/postinstall.js",
     "test:price": "node skills/solana-market/scripts/get-price.js SOL",
     "test:overview": "node skills/solana-market/scripts/market-overview.js",
     "test": "node --test tests/**/*.test.js"
   },
+  "files": [
+    "skills/",
+    "shared/",
+    "bin/",
+    "AGENTS.md",
+    ".env.example",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
+    "openclaw",
     "solana",
-    "telegram",
     "defi",
     "ai",
     "investment",
     "portfolio",
-    "dca"
+    "dca",
+    "telegram",
+    "agent",
+    "skills"
   ],
-  "author": "",
+  "author": "jeseli689",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeseli689/OpenClaw-Instances-for-Investors"
+  },
+  "homepage": "https://github.com/jeseli689/OpenClaw-Instances-for-Investors#readme",
+  "bugs": {
+    "url": "https://github.com/jeseli689/OpenClaw-Instances-for-Investors/issues"
+  },
   "dependencies": {
     "@solana/spl-token": "^0.4.0",
     "@solana/web3.js": "^1.95.0",
     "axios": "^1.7.0",
     "better-sqlite3": "^11.0.0",
     "dotenv": "^16.4.0",
-    "node-cron": "^3.0.3",
-    "node-telegram-bot-api": "^0.66.0"
+    "node-cron": "^3.0.3"
   },
   "engines": {
     "node": ">=20.0.0"
