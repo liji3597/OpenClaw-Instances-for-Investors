@@ -64,30 +64,45 @@
 
 ## Architecture
 
+The project follows an **OpenClaw Gateway Skills** architecture — each capability is a standalone Skill invoked by the AI Agent via CLI scripts.
+
 ```
-src/
-├── index.js                  # Application entry point
-├── config/index.js           # Environment configuration & token registry
-├── db/database.js            # SQLite database (6 tables, full CRUD)
-├── solana/
-│   ├── connection.js         # Solana RPC with exponential backoff retry
-│   ├── wallet.js             # Balance queries & multi-wallet aggregation
-│   └── jupiter.js            # Price API (CoinGecko) & swap quotes (Jupiter)
-├── portfolio/
-│   ├── tracker.js            # Holdings aggregation & USD valuation
-│   └── formatter.js          # Bilingual Telegram message formatting
-├── strategies/
-│   ├── dca.js                # Cron-scheduled DCA engine
-│   └── alerts.js             # Price alert polling & notifications
-└── bot/
-    ├── index.js              # Bot orchestrator & NLP routing
-    ├── nlp.js                # Chinese/English keyword intent parsing
-    └── commands/
-        ├── start.js          # /start, /help, /lang
-        ├── portfolio.js      # /portfolio, /addwallet, /wallets
-        ├── strategy.js       # /dca wizard, /strategies, /pause, /resume
-        ├── alerts.js         # /alert, /alerts, /deletealert
-        └── market.js         # /price, /market
+AGENTS.md                         # AI Agent persona & role definition
+skills/
+├── solana-portfolio/              # Portfolio management skill
+│   ├── SKILL.md                  # Skill definition & usage guide
+│   └── scripts/
+│       ├── get-portfolio.js      # View portfolio summary
+│       ├── add-wallet.js         # Add a Solana wallet
+│       ├── list-wallets.js       # List connected wallets
+│       └── remove-wallet.js      # Remove a wallet
+├── solana-dca/                    # DCA strategy skill
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── create-dca.js         # Create DCA strategy
+│       ├── list-strategies.js    # List strategies
+│       ├── pause-strategy.js     # Pause a strategy
+│       └── resume-strategy.js    # Resume a strategy
+├── solana-alerts/                 # Price alert skill
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── create-alert.js       # Create price alert
+│       ├── list-alerts.js        # List active alerts
+│       ├── delete-alert.js       # Delete an alert
+│       └── check-prices.js       # Check all alerts against prices
+└── solana-market/                 # Market intelligence skill
+    ├── SKILL.md
+    └── scripts/
+        ├── get-price.js          # Get token price
+        └── market-overview.js    # Ecosystem price overview
+shared/
+├── config.js                     # Environment configuration & token registry
+├── database.js                   # SQLite database (5 tables, full CRUD)
+├── solana-connection.js          # Solana RPC with exponential backoff retry
+├── wallet.js                     # Balance queries & multi-wallet aggregation
+├── price-service.js              # CoinGecko prices & Jupiter swap quotes
+├── tracker.js                    # Holdings aggregation & USD valuation
+└── formatter.js                  # Bilingual message formatting
 ```
 
 ### Technology Stack
@@ -153,31 +168,29 @@ HELIUS_API_KEY=your_helius_key_here
 PRICE_CHECK_INTERVAL=60
 ```
 
-### Run
+### Run Skills
+
+Skills are invoked as standalone CLI scripts by the AI Agent (or manually for testing):
 
 ```bash
-# Start the bot
-npm start
+# Example: Check a token price
+node skills/solana-market/scripts/get-price.js SOL
 
-# Development mode (auto-restart on file changes)
-npm run dev
+# Example: View portfolio for user 12345
+node skills/solana-portfolio/scripts/get-portfolio.js 12345
+
+# Example: Create a DCA strategy
+node skills/solana-dca/scripts/create-dca.js 12345 SOL 100 weekly
+
+# Example: Set a price alert
+node skills/solana-alerts/scripts/create-alert.js 12345 SOL above 200
 ```
 
-You should see:
+You should see output like:
 
 ```
-═══════════════════════════════════════════════
-   🦅 OpenClaw Investor Suite  v1.0.0
-   AI Investment Assistant for Solana
-═══════════════════════════════════════════════
-
 ✅ Database initialized
-✅ Solana RPC connected (devnet)
-🤖 Telegram bot started
-📅 Initializing 0 active DCA strategies
-🔔 Alert monitor started (checking every 60s)
-
-✅ All systems online! Waiting for Telegram messages...
+💲 *SOL* 当前价格 / Current Price: $142.35
 ```
 
 ## Bot Commands
@@ -250,27 +263,9 @@ npm install --production
 cp .env.example .env
 nano .env  # Configure your tokens
 
-# Run with PM2 for production
-npm install -g pm2
-pm2 start src/index.js --name openclaw
-pm2 save
-pm2 startup  # Auto-start on reboot
-```
-
-### Option 2: Docker
-
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --production
-COPY . .
-CMD ["node", "src/index.js"]
-```
-
-```bash
-docker build -t openclaw-investor-suite .
-docker run -d --env-file .env --name openclaw openclaw-investor-suite
+# Skills are invoked by the OpenClaw Gateway AI Agent
+# Test a skill manually:
+node skills/solana-market/scripts/get-price.js SOL
 ```
 
 ### Option 3: Local Development
@@ -354,30 +349,45 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## 项目架构
 
+项目采用 **OpenClaw Gateway Skills** 架构 — 每个功能是一个独立的 Skill，由 AI Agent 通过 CLI 脚本调用。
+
 ```
-src/
-├── index.js                  # 应用入口
-├── config/index.js           # 环境配置 & 代币注册表
-├── db/database.js            # SQLite 数据库（6 张表，完整 CRUD）
-├── solana/
-│   ├── connection.js         # Solana RPC 连接（指数退避重试）
-│   ├── wallet.js             # 余额查询 & 多钱包聚合
-│   └── jupiter.js            # 价格 API (CoinGecko) & 交换报价 (Jupiter)
-├── portfolio/
-│   ├── tracker.js            # 持仓聚合 & USD 估值
-│   └── formatter.js          # 双语 Telegram 消息格式化
-├── strategies/
-│   ├── dca.js                # Cron 定时 DCA 引擎
-│   └── alerts.js             # 价格警报轮询 & 通知
-└── bot/
-    ├── index.js              # Bot 编排器 & NLP 路由
-    ├── nlp.js                # 中英文关键词意图解析
-    └── commands/
-        ├── start.js          # /start, /help, /lang
-        ├── portfolio.js      # /portfolio, /addwallet, /wallets
-        ├── strategy.js       # /dca 向导, /strategies, /pause, /resume
-        ├── alerts.js         # /alert, /alerts, /deletealert
-        └── market.js         # /price, /market
+AGENTS.md                         # AI Agent 人格与角色定义
+skills/
+├── solana-portfolio/              # 投资组合管理技能
+│   ├── SKILL.md                  # 技能定义与使用指南
+│   └── scripts/
+│       ├── get-portfolio.js      # 查看投资组合
+│       ├── add-wallet.js         # 添加钱包
+│       ├── list-wallets.js       # 查看钱包列表
+│       └── remove-wallet.js      # 移除钱包
+├── solana-dca/                    # DCA 定投技能
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── create-dca.js         # 创建定投策略
+│       ├── list-strategies.js    # 查看策略列表
+│       ├── pause-strategy.js     # 暂停策略
+│       └── resume-strategy.js    # 恢复策略
+├── solana-alerts/                 # 价格警报技能
+│   ├── SKILL.md
+│   └── scripts/
+│       ├── create-alert.js       # 创建警报
+│       ├── list-alerts.js        # 查看警报
+│       ├── delete-alert.js       # 删除警报
+│       └── check-prices.js       # 检查所有警报
+└── solana-market/                 # 市场情报技能
+    ├── SKILL.md
+    └── scripts/
+        ├── get-price.js          # 查询代币价格
+        └── market-overview.js    # 生态市场概览
+shared/
+├── config.js                     # 环境配置与代币注册表
+├── database.js                   # SQLite 数据库（5 张表，完整 CRUD）
+├── solana-connection.js          # Solana RPC 连接（指数退避重试）
+├── wallet.js                     # 余额查询与多钱包聚合
+├── price-service.js              # CoinGecko 价格与 Jupiter 交换报价
+├── tracker.js                    # 持仓聚合与 USD 估值
+└── formatter.js                  # 双语消息格式化
 ```
 
 ### 技术栈
@@ -443,31 +453,29 @@ HELIUS_API_KEY=your_helius_key_here
 PRICE_CHECK_INTERVAL=60
 ```
 
-### 启动
+### 运行技能
+
+技能由 AI Agent（OpenClaw Gateway）以 CLI 脚本方式调用，也可手动测试：
 
 ```bash
-# 启动机器人
-npm start
+# 示例：查询代币价格
+node skills/solana-market/scripts/get-price.js SOL
 
-# 开发模式（文件变更自动重启）
-npm run dev
+# 示例：查看用户 12345 的投资组合
+node skills/solana-portfolio/scripts/get-portfolio.js 12345
+
+# 示例：创建 DCA 定投策略
+node skills/solana-dca/scripts/create-dca.js 12345 SOL 100 weekly
+
+# 示例：设置价格警报
+node skills/solana-alerts/scripts/create-alert.js 12345 SOL above 200
 ```
 
-启动成功后会看到：
+运行后会看到类似输出：
 
 ```
-═══════════════════════════════════════════════
-   🦅 OpenClaw Investor Suite  v1.0.0
-   AI Investment Assistant for Solana
-═══════════════════════════════════════════════
-
 ✅ Database initialized
-✅ Solana RPC connected (devnet)
-🤖 Telegram bot started
-📅 Initializing 0 active DCA strategies
-🔔 Alert monitor started (checking every 60s)
-
-✅ All systems online! Waiting for Telegram messages...
+💲 *SOL* 当前价格 / Current Price: $142.35
 ```
 
 ## 机器人命令
@@ -540,22 +548,9 @@ npm install --production
 cp .env.example .env
 nano .env  # 配置你的 Token
 
-# 使用 PM2 生产部署
-npm install -g pm2
-pm2 start src/index.js --name openclaw
-pm2 save
-pm2 startup  # 开机自启
-```
-
-### 方案二：Docker 部署
-
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --production
-COPY . .
-CMD ["node", "src/index.js"]
+# 技能由 OpenClaw Gateway AI Agent 调用
+# 手动测试技能：
+node skills/solana-market/scripts/get-price.js SOL
 ```
 
 ```bash

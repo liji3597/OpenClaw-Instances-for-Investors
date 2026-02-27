@@ -1,11 +1,10 @@
 {
   "name": "openclaw-investor-suite",
   "version": "1.0.0",
-  "description": "Managed AI Investment Assistant for Solana — zero-barrier portfolio management via Telegram",
-  "main": "src/index.js",
+  "description": "Managed AI Investment Assistant for Solana — zero-barrier portfolio management via OpenClaw Gateway Skills",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "test:price": "node skills/solana-market/scripts/get-price.js SOL",
+    "test:overview": "node skills/solana-market/scripts/market-overview.js",
     "test": "node --test tests/**/*.test.js"
   },
   "keywords": [

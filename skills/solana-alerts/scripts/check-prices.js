@@ -7,13 +7,13 @@
 const path = require('path');
 const sharedDir = path.resolve(__dirname, '..', '..', '..', 'shared');
 
-const { initDatabase, getAllActiveAlerts } = require(path.join(sharedDir, 'database'));
+const { initDatabase, getActiveAlerts } = require(path.join(sharedDir, 'database'));
 const { getTokenPrice } = require(path.join(sharedDir, 'price-service'));
 const { formatUSD } = require(path.join(sharedDir, 'formatter'));
 
 async function main() {
     initDatabase();
-    const alerts = getAllActiveAlerts();
+    const alerts = getActiveAlerts();
 
     if (alerts.length === 0) {
         console.log('No active alerts to check.');
