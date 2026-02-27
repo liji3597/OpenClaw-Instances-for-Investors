@@ -2,9 +2,6 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const config = {
-  // Telegram
-  telegramToken: process.env.TELEGRAM_BOT_TOKEN || '',
-
   // Solana
   solanaNetwork: process.env.SOLANA_NETWORK || 'devnet',
   heliusApiKey: process.env.HELIUS_API_KEY || '',
@@ -22,12 +19,8 @@ const config = {
     return urls[this.solanaNetwork] || urls.devnet;
   },
 
-  // Jupiter API — v3 (v2 deprecated since Sep 2025)
-  jupiterPriceApiBase: 'https://api.jup.ag/price/v3',
+  // Jupiter DEX (swap quotes only — prices come from CoinGecko)
   jupiterQuoteApiBase: 'https://api.jup.ag/swap/v1',
-
-  // Price monitoring
-  priceCheckInterval: parseInt(process.env.PRICE_CHECK_INTERVAL || '60', 10) * 1000,
 
   // DCA
   defaultSlippageBps: parseInt(process.env.DEFAULT_SLIPPAGE_BPS || '50', 10),
@@ -50,20 +43,6 @@ const config = {
     'So11111111111111111111111111111111111111112': 9,
     'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 6,
     'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 6,
-  },
-
-  validate() {
-    const errors = [];
-    if (!this.telegramToken) errors.push('TELEGRAM_BOT_TOKEN is required');
-    if (errors.length > 0) {
-      console.error('❌ Configuration errors:');
-      errors.forEach(e => console.error(`  - ${e}`));
-      console.error('\nPlease copy .env.example to .env and fill in the required values.');
-      process.exit(1);
-    }
-    if (!this.heliusApiKey) {
-      console.warn('⚠️  HELIUS_API_KEY not set — using public Solana RPC (rate-limited)');
-    }
   },
 };
 

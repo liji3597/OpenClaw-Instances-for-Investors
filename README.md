@@ -80,7 +80,7 @@ User (Telegram) → OpenClaw (LLM) → Our Skills → Solana blockchain
 
 ```bash
 npm install openclaw-investor-suite
-npx openclaw-investor-setup
+npx openclaw-investor-suite
 ```
 
 This installs the package and copies all skills into `~/.openclaw/workspace/`.
@@ -97,7 +97,7 @@ npm install
 
 ```bash
 npm install openclaw-investor-suite
-npx openclaw-investor-setup /your/custom/workspace/path
+npx openclaw-investor-suite /your/custom/workspace/path
 ```
 
 After installation, optionally configure environment:
@@ -248,7 +248,7 @@ MIT
 
 ```bash
 npm install openclaw-investor-suite
-npx openclaw-investor-setup
+npx openclaw-investor-suite
 ```
 
 自动安装并复制所有技能到 `~/.openclaw/workspace/`。
@@ -265,7 +265,7 @@ npm install
 
 ```bash
 npm install openclaw-investor-suite
-npx openclaw-investor-setup /你的/workspace/路径
+npx openclaw-investor-suite /你的/workspace/路径
 ```
 
 安装完成后，可选配置环境变量：

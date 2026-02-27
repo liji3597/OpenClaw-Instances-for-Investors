@@ -1,15 +1,14 @@
 {
   "name": "openclaw-investor-suite",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Solana AI Investment Assistant Skills for OpenClaw — portfolio tracking, DCA strategies, price alerts & market intelligence",
   "bin": {
-    "openclaw-investor-setup": "./bin/setup.js"
+    "openclaw-investor-suite": "bin/setup.js"
   },
   "scripts": {
-    "postinstall": "node bin/postinstall.js",
+    "setup": "node bin/setup.js",
     "test:price": "node skills/solana-market/scripts/get-price.js SOL",
-    "test:overview": "node skills/solana-market/scripts/market-overview.js",
-    "test": "node --test tests/**/*.test.js"
+    "test:overview": "node skills/solana-market/scripts/market-overview.js"
   },
   "files": [
     "skills/",
@@ -28,7 +27,6 @@
     "investment",
     "portfolio",
     "dca",
-    "telegram",
     "agent",
     "skills"
   ],
@@ -36,7 +34,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jeseli689/OpenClaw-Instances-for-Investors"
+    "url": "git+https://github.com/jeseli689/OpenClaw-Instances-for-Investors.git"
   },
   "homepage": "https://github.com/jeseli689/OpenClaw-Instances-for-Investors#readme",
   "bugs": {
@@ -47,8 +45,7 @@
     "@solana/web3.js": "^1.95.0",
     "axios": "^1.7.0",
     "better-sqlite3": "^11.0.0",
-    "dotenv": "^16.4.0",
-    "node-cron": "^3.0.3"
+    "dotenv": "^16.4.0"
   },
   "engines": {
     "node": ">=20.0.0"
