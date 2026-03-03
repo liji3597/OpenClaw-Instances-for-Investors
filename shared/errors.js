@@ -15,6 +15,7 @@ const ERROR_CODES = {
     ALERT_NOT_FOUND: { zh: '警报不存在或无权限删除', en: 'Alert not found or unauthorized to delete' },
     ALERT_CREATED: { zh: '警报创建成功', en: 'Alert created successfully' },
     ALERT_DELETED: { zh: '警报删除成功', en: 'Alert deleted successfully' },
+    ALERT_LIMIT_REACHED: { zh: '价格警报已达上限（最多 20 个）', en: 'Alert limit reached (maximum 20)' },
 };
 
 function formatError(code, lang = 'zh') {

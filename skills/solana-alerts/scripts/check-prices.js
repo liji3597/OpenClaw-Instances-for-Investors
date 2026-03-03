@@ -1,55 +1,55 @@
 #!/usr/bin/env node
 /**
  * Check all active alerts against current prices
- * Usage: node check-prices.js
- * Outputs any triggered alerts.
+ * Usage: node check-prices.js [--system] [--lang zh|en]
  */
 const path = require('path');
 const sharedDir = path.resolve(__dirname, '..', '..', '..', 'shared');
 
-const { initDatabase, getActiveAlertsForSystem, markAlertTriggeredOnce } = require(path.join(sharedDir, 'database'));
+const { getActiveAlertsForSystem, markAlertTriggeredOnce } = require(path.join(sharedDir, 'services'));
+const { formatError } = require(path.join(sharedDir, 'errors'));
 const { getTokenPrice } = require(path.join(sharedDir, 'price-service'));
 const { formatUSD } = require(path.join(sharedDir, 'formatter'));
 
-async function main() {
-    initDatabase();
+const lang = process.argv.includes('--lang') ? process.argv[process.argv.indexOf('--lang') + 1] : 'zh';
 
+async function main() {
     // Security: verify this is a system-authorized call
     if (process.env.OPENCLAW_SYSTEM !== 'true' && !process.argv.includes('--system')) {
-        console.error('❌ 未授权的系统调用 / Unauthorized system call');
-        console.error('This script requires --system flag or OPENCLAW_SYSTEM=true');
+        console.log(`❌ ${formatError('INTERNAL_ERROR', lang)}: ${lang === 'zh' ? '未授权的系统调用' : 'Unauthorized system call'}`);
+        process.exit(1);
+    }
+
+    if (typeof getActiveAlertsForSystem !== 'function' || typeof markAlertTriggeredOnce !== 'function') {
+        console.log(`❌ ${formatError('INTERNAL_ERROR', lang)}`);
         process.exit(1);
     }
 
     const alerts = getActiveAlertsForSystem();
-
-    if (alerts.length === 0) {
-        console.log('No active alerts to check.');
-        return;
+    if (!alerts || alerts.length === 0) {
+        console.log('📭 暂无活跃警报 / No active alerts');
+        process.exit(0);
     }
-
-    console.log(`Checking ${alerts.length} alerts...\n`);
 
     for (const alert of alerts) {
-        const price = await getTokenPrice(alert.token_symbol);
-        if (price === 0) continue;
+        const price = await getTokenPrice(alert.token_mint || alert.token_symbol);
+        if (!Number.isFinite(price) || price <= 0) continue;
 
-        let triggered = false;
-        if (alert.condition === 'above' && price >= alert.target_price) triggered = true;
-        if (alert.condition === 'below' && price <= alert.target_price) triggered = true;
+        const triggered = alert.condition === 'above'
+            ? price >= alert.target_price
+            : price <= alert.target_price;
 
-        if (triggered) {
-            const marked = markAlertTriggeredOnce(alert.id);
-            if (!marked) {
-                continue;
-            }
+        if (!triggered) continue;
 
-            const condStr = alert.condition === 'above' ? '高于/above' : '低于/below';
-            console.log(`🚨 TRIGGERED: ${alert.token_symbol} (${formatUSD(price)}) ${condStr} ${formatUSD(alert.target_price)}`);
-        }
+        const marked = markAlertTriggeredOnce(alert.id);
+        if (!marked) continue;
+
+        const condStr = alert.condition === 'above' ? '高于 / above' : '低于 / below';
+        console.log(`🚨 TRIGGERED: ${alert.token_symbol} ${condStr} ${formatUSD(alert.target_price)} (current: ${formatUSD(price)})`);
     }
-
-    console.log('\nDone.');
 }
 
-main().catch(err => { console.error('Error:', err.message); process.exit(1); });
+main().catch((err) => {
+    console.log(`❌ ${formatError(err.code || 'INTERNAL_ERROR', lang)}`);
+    process.exit(1);
+});

@@ -1,4 +1,10 @@
-const { initDatabase, findOrCreateUser } = require('../database');
+const {
+    initDatabase,
+    findOrCreateUser: dbFindOrCreateUser,
+    getUserWallets: dbGetUserWallets,
+    addWallet: dbAddWallet,
+    removeWallet: dbRemoveWallet,
+} = require('../database');
 const { ERROR_CODES } = require('../errors');
 
 function getUserContext(telegramId) {
@@ -9,7 +15,7 @@ function getUserContext(telegramId) {
     }
 
     initDatabase();
-    const user = findOrCreateUser(telegramId, '');
+    const user = dbFindOrCreateUser(telegramId, '');
 
     return {
         id: user.id,
@@ -18,6 +24,30 @@ function getUserContext(telegramId) {
     };
 }
 
+function findOrCreateUser(telegramId, username = '') {
+    initDatabase();
+    return dbFindOrCreateUser(telegramId, username);
+}
+
+function getUserWallets(userId) {
+    initDatabase();
+    return dbGetUserWallets(userId);
+}
+
+function addWallet(userId, address, label) {
+    initDatabase();
+    return dbAddWallet(userId, address, label);
+}
+
+function removeWallet(userId, address) {
+    initDatabase();
+    return dbRemoveWallet(userId, address);
+}
+
 module.exports = {
     getUserContext,
+    findOrCreateUser,
+    getUserWallets,
+    addWallet,
+    removeWallet,
 };

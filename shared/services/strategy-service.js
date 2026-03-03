@@ -1,4 +1,4 @@
-const { getUserStrategies, updateStrategyStatus } = require('../database');
+const { getUserStrategies, updateStrategyStatus, createDcaStrategy } = require('../database');
 const { getUserContext } = require('./user-context');
 
 function validateStrategyOwnership(userId, strategyId) {
@@ -47,8 +47,30 @@ function resumeStrategy(telegramId, strategyId) {
     }
 }
 
+function createStrategy(telegramId, strategyData) {
+    try {
+        const user = getUserContext(telegramId);
+        const strategyId = createDcaStrategy(user.id, strategyData);
+        return { ok: true, code: 'OK', strategyId };
+    } catch (err) {
+        return { ok: false, code: err.code || 'INTERNAL_ERROR' };
+    }
+}
+
+function listStrategies(telegramId) {
+    try {
+        const user = getUserContext(telegramId);
+        const strategies = getUserStrategies(user.id);
+        return { ok: true, code: 'OK', strategies };
+    } catch (err) {
+        return { ok: false, code: err.code || 'INTERNAL_ERROR' };
+    }
+}
+
 module.exports = {
     validateStrategyOwnership,
     pauseStrategy,
     resumeStrategy,
+    createStrategy,
+    listStrategies,
 };

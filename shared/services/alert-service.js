@@ -1,4 +1,11 @@
-const { createAlert, deleteAlert } = require('../database');
+const {
+    initDatabase,
+    createAlert,
+    deleteAlert,
+    getActiveAlerts,
+    getActiveAlertsForSystem: dbGetActiveAlertsForSystem,
+    markAlertTriggeredOnce: dbMarkAlertTriggeredOnce,
+} = require('../database');
 const { resolveToken } = require('../price-service');
 const { getUserContext } = require('./user-context');
 
@@ -15,6 +22,11 @@ function createAlertForUser(telegramId, alertData) {
 
         const tokenMint = resolveToken(tokenSymbol);
         if (!tokenMint) return { ok: false, code: 'UNKNOWN_TOKEN' };
+
+        // Check alert limit (max 20)
+        if (getActiveAlerts(user.id).length >= 20) {
+            return { ok: false, code: 'ALERT_LIMIT_REACHED' };
+        }
 
         const alertId = createAlert(user.id, tokenSymbol, tokenMint, condition, targetPrice);
         return { ok: true, code: 'ALERT_CREATED', alertId };
@@ -40,7 +52,30 @@ function deleteAlertForUser(telegramId, alertId) {
     }
 }
 
+function listAlerts(telegramId) {
+    try {
+        const user = getUserContext(telegramId);
+        const alerts = getActiveAlerts(user.id);
+        return { ok: true, code: 'OK', alerts };
+    } catch (err) {
+        return { ok: false, code: err.code || 'INTERNAL_ERROR' };
+    }
+}
+
+function getActiveAlertsForSystem() {
+    initDatabase();
+    return dbGetActiveAlertsForSystem();
+}
+
+function markAlertTriggeredOnce(alertId) {
+    initDatabase();
+    return dbMarkAlertTriggeredOnce(alertId);
+}
+
 module.exports = {
     createAlertForUser,
     deleteAlertForUser,
+    listAlerts,
+    getActiveAlertsForSystem,
+    markAlertTriggeredOnce,
 };
