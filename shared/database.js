@@ -161,14 +161,21 @@ function createAlert(userId, tokenSymbol, tokenMint, condition, targetPrice) {
 }
 
 function getActiveAlerts(userId) {
-    if (userId) {
-        return getDb().prepare('SELECT * FROM price_alerts WHERE user_id = ? AND is_active = 1').all(userId);
+    if (!userId) {
+        throw new Error('userId is required for getActiveAlerts');
     }
+    return getDb().prepare('SELECT * FROM price_alerts WHERE user_id = ? AND is_active = 1').all(userId);
+}
+
+function getActiveAlertsForSystem() {
     return getDb().prepare('SELECT * FROM price_alerts WHERE is_active = 1').all();
 }
 
-function triggerAlert(alertId) {
-    getDb().prepare('UPDATE price_alerts SET is_active = 0, triggered_at = CURRENT_TIMESTAMP WHERE id = ?').run(alertId);
+function markAlertTriggeredOnce(alertId) {
+    const result = getDb().prepare(
+        'UPDATE price_alerts SET is_active = 0, triggered_at = CURRENT_TIMESTAMP WHERE id = ? AND is_active = 1'
+    ).run(alertId);
+    return result.changes > 0;
 }
 
 function deleteAlert(alertId, userId) {
@@ -194,8 +201,11 @@ function getActiveStrategies() {
     return getDb().prepare('SELECT ds.*, u.telegram_id FROM dca_strategies ds JOIN users u ON ds.user_id = u.id WHERE ds.status = ?').all('active');
 }
 
-function updateStrategyStatus(strategyId, status) {
-    getDb().prepare('UPDATE dca_strategies SET status = ? WHERE id = ?').run(status, strategyId);
+function updateStrategyStatus(strategyId, status, userId) {
+    const result = getDb().prepare(
+        'UPDATE dca_strategies SET status = ? WHERE id = ? AND user_id = ?'
+    ).run(status, strategyId, userId);
+    return result.changes > 0;
 }
 
 function recordStrategyExecution(strategyId, spent, received) {
@@ -245,8 +255,11 @@ module.exports = {
     // Alerts
     createAlert,
     getActiveAlerts,
-    triggerAlert,
+    getActiveAlertsForSystem,
+    markAlertTriggeredOnce,
     deleteAlert,
+    // Deprecated aliases (will be removed in v2.0)
+    triggerAlert: markAlertTriggeredOnce,
     // DCA
     createDcaStrategy,
     getUserStrategies,

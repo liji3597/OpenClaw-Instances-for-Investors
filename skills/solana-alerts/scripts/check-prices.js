@@ -7,13 +7,21 @@
 const path = require('path');
 const sharedDir = path.resolve(__dirname, '..', '..', '..', 'shared');
 
-const { initDatabase, getActiveAlerts } = require(path.join(sharedDir, 'database'));
+const { initDatabase, getActiveAlertsForSystem, markAlertTriggeredOnce } = require(path.join(sharedDir, 'database'));
 const { getTokenPrice } = require(path.join(sharedDir, 'price-service'));
 const { formatUSD } = require(path.join(sharedDir, 'formatter'));
 
 async function main() {
     initDatabase();
-    const alerts = getActiveAlerts();
+
+    // Security: verify this is a system-authorized call
+    if (process.env.OPENCLAW_SYSTEM !== 'true' && !process.argv.includes('--system')) {
+        console.error('❌ 未授权的系统调用 / Unauthorized system call');
+        console.error('This script requires --system flag or OPENCLAW_SYSTEM=true');
+        process.exit(1);
+    }
+
+    const alerts = getActiveAlertsForSystem();
 
     if (alerts.length === 0) {
         console.log('No active alerts to check.');
@@ -31,8 +39,13 @@ async function main() {
         if (alert.condition === 'below' && price <= alert.target_price) triggered = true;
 
         if (triggered) {
+            const marked = markAlertTriggeredOnce(alert.id);
+            if (!marked) {
+                continue;
+            }
+
             const condStr = alert.condition === 'above' ? '高于/above' : '低于/below';
-            console.log(`🚨 TRIGGERED: ${alert.token_symbol} (${formatUSD(price)}) ${condStr} ${formatUSD(alert.target_price)} — User: ${alert.user_id}`);
+            console.log(`🚨 TRIGGERED: ${alert.token_symbol} (${formatUSD(price)}) ${condStr} ${formatUSD(alert.target_price)}`);
         }
     }
 

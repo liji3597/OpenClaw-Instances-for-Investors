@@ -14,7 +14,9 @@
       "WebFetch(domain:help.apiyi.com)",
       "WebFetch(domain:www.maxpetrusenko.com)",
       "WebFetch(domain:stormap.ai)",
-      "WebFetch(domain:lumadock.com)"
+      "WebFetch(domain:lumadock.com)",
+      "mcp__contextweaver__codebase-retrieval",
+      "Bash(C:/Users/asd10/.claude/bin/codeagent-wrapper.exe --backend:*)"
     ]
   }
 }
