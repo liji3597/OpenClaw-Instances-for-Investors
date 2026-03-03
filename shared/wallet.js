@@ -1,5 +1,6 @@
 const { PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
-const { TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+// TOKEN_PROGRAM_ID inlined to avoid @solana/spl-token dependency (CVE-2025-3194 in transitive bigint-buffer)
+const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 const { getConnection, withRetry } = require('./solana-connection');
 const config = require('./config');
 
