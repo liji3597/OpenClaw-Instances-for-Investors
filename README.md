@@ -33,10 +33,11 @@ User (Telegram) → OpenClaw (LLM) → Our Skills → Solana blockchain
 
 | Skill | Description | Scripts |
 |-------|-------------|---------|
-| **solana-portfolio** | Multi-wallet portfolio tracking & asset distribution | `get-portfolio`, `add-wallet`, `list-wallets`, `remove-wallet` |
-| **solana-dca** | Dollar-Cost Averaging strategy engine | `create-dca`, `list-strategies`, `pause-strategy`, `resume-strategy` |
-| **solana-alerts** | Price alert monitoring & notifications | `create-alert`, `list-alerts`, `delete-alert`, `check-prices` |
-| **solana-market** | Token price queries & ecosystem overview | `get-price`, `market-overview` |
+| 🦅 **solana-investor** | Top-level orchestrator — coordinates multi-skill requests | *(no scripts — pure prompt)* |
+| 💼 **solana-portfolio** | Multi-wallet portfolio tracking & asset distribution | `get-portfolio`, `add-wallet`, `list-wallets`, `remove-wallet` |
+| 📈 **solana-dca** | Dollar-Cost Averaging strategy engine | `create-dca`, `list-strategies`, `pause-strategy`, `resume-strategy` |
+| 🔔 **solana-alerts** | Price alert monitoring & notifications | `create-alert`, `list-alerts`, `delete-alert`, `check-prices` |
+| 💲 **solana-market** | Token price queries & ecosystem overview | `get-price`, `market-overview` |
 
 ## Project Structure
 
@@ -52,9 +53,11 @@ User (Telegram) → OpenClaw (LLM) → Our Skills → Solana blockchain
 │   ├── price-service.js                # CoinGecko price API with caching
 │   ├── tracker.js                      # Portfolio valuation engine
 │   └── formatter.js                    # Bilingual output formatting (中文/EN)
-└── skills/                             # OpenClaw Skills (drop into workspace)
+└── skills/                             # OpenClaw Skills (prompt-centric)
+    ├── solana-investor/                # 🦅 Orchestrator (pure prompt, no scripts)
+    │   └── SKILL.md
     ├── solana-portfolio/
-    │   ├── SKILL.md
+    │   ├── SKILL.md                    # Workflow + Guardrails + metadata
     │   └── scripts/
     ├── solana-dca/
     │   ├── SKILL.md
@@ -127,7 +130,7 @@ Open Telegram and chat with your OpenClaw bot:
 |----------|----------|-------------|
 | `HELIUS_API_KEY` | Optional | Enhanced Solana RPC ([helius.xyz](https://helius.xyz)) |
 | `SOLANA_NETWORK` | Optional | `devnet` (default) or `mainnet-beta` |
-| `PRICE_CHECK_INTERVAL` | Optional | Alert check interval in seconds (default: 60) |
+| `DEFAULT_SLIPPAGE_BPS` | Optional | DCA slippage tolerance, default 50 (0.5%) |
 | `DATABASE_PATH` | Optional | SQLite database path (default: `./data/openclaw.db`) |
 
 > **Note:** `TELEGRAM_BOT_TOKEN` is managed by OpenClaw itself — you don't need to set it here.
@@ -171,24 +174,37 @@ Open Telegram and chat with your OpenClaw bot:
 
 All skills support **Chinese (中文)** and **English** output. OpenClaw's LLM detects the user's language automatically. Scripts accept `--lang en` or `--lang zh` flag.
 
-### SKILL.md Format
+### SKILL.md Format (Prompt-Centric)
 
-Each skill follows the [AgentSkills standard](https://openclaw.ai):
+Each skill follows the [AgentSkills standard](https://openclaw.ai) with **Workflow** and **Guardrails**:
 
 ```yaml
 ---
 name: solana-portfolio
-description: Manage Solana portfolios — track multi-wallet balances and token distribution
+description: Manage Solana portfolios...
+version: 1.0.0
+metadata:
+  openclaw:
+    requires: { env: ["SOLANA_NETWORK"], bins: ["node"] }
+    emoji: "💼"
 ---
 
-# When to Use
-When the user wants to view portfolio, add wallet, check holdings...
+## When to Use
+User wants to view portfolio, add wallet...
 
-# Available Scripts
-node skills/solana-portfolio/scripts/get-portfolio.js <user_id>
+## Workflow
+### User wants to view portfolio
+1. Get Telegram User ID
+2. Run `node scripts/get-portfolio.js <user_id>`
+3. If no wallets → guide user to add one
+4. If success → show results + suggest next action
+
+## Guardrails
+- Never recommend buying/selling
+- Confirm before write operations
 ```
 
-OpenClaw injects these descriptions into the LLM context, which then selects the right skill and script based on user intent.
+OpenClaw injects these into the LLM context. The LLM reads the **Workflow** to decide *how* to act, and follows **Guardrails** for safety.
 
 ## Supported Tokens
 
@@ -230,10 +246,11 @@ MIT
 
 | 技能 | 说明 | 脚本 |
 |------|------|------|
-| **solana-portfolio** | 多钱包投资组合追踪和资产分布 | `get-portfolio`, `add-wallet`, `list-wallets`, `remove-wallet` |
-| **solana-dca** | DCA 定投策略引擎 | `create-dca`, `list-strategies`, `pause-strategy`, `resume-strategy` |
-| **solana-alerts** | 价格警报监控和通知 | `create-alert`, `list-alerts`, `delete-alert`, `check-prices` |
-| **solana-market** | 代币价格查询和生态概览 | `get-price`, `market-overview` |
+| 🦅 **solana-investor** | 顶层编排器 — 协调多技能组合请求 | *（纯 Prompt，无脚本）* |
+| 💼 **solana-portfolio** | 多钱包投资组合追踪和资产分布 | `get-portfolio`, `add-wallet`, `list-wallets`, `remove-wallet` |
+| 📈 **solana-dca** | DCA 定投策略引擎 | `create-dca`, `list-strategies`, `pause-strategy`, `resume-strategy` |
+| 🔔 **solana-alerts** | 价格警报监控和通知 | `create-alert`, `list-alerts`, `delete-alert`, `check-prices` |
+| 💲 **solana-market** | 代币价格查询和生态概览 | `get-price`, `market-overview` |
 
 ## 快速开始
 
@@ -328,7 +345,7 @@ nano .env   # 填入 HELIUS_API_KEY
 |------|---------|------|
 | `HELIUS_API_KEY` | 可选 | 增强 Solana RPC（[helius.xyz](https://helius.xyz) 免费申请） |
 | `SOLANA_NETWORK` | 可选 | `devnet`（默认）或 `mainnet-beta` |
-| `PRICE_CHECK_INTERVAL` | 可选 | 警报检查间隔，单位秒（默认 60） |
+| `DEFAULT_SLIPPAGE_BPS` | 可选 | DCA 滑点容差，默认 50（0.5%） |
 | `DATABASE_PATH` | 可选 | SQLite 数据库路径 |
 
 > **注意：** Telegram Bot Token 由 OpenClaw 管理，不需要在这里配置。
@@ -347,6 +364,8 @@ nano .env   # 填入 HELIUS_API_KEY
 - [x] 价格警报系统
 - [x] CoinGecko 价格数据集成
 - [x] 中英文双语支持
+- [x] Prompt-Centric SKILL.md（Workflow + Guardrails）
+- [x] 多技能编排器（Orchestrator Skill）
 - [ ] PnL 盈亏追踪（成本基础、已实现/未实现盈亏）
 - [ ] 智能再平衡策略
 - [ ] 止损/止盈功能

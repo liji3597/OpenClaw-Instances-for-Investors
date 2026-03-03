@@ -1,50 +1,54 @@
 ---
 name: solana-market
-description: Query real-time Solana token prices and view ecosystem market overview from CoinGecko.
+description: 查询 Solana 生态代币实时价格和市场概览。当用户想知道代币价格、行情、市场状况时触发。
+version: 1.0.0
+metadata:
+  openclaw:
+    requires:
+      bins: ["node"]
+    emoji: "💲"
 ---
 
-# Solana Market Intelligence
+# Solana 市场情报
 
 ## When to Use
 
-Use this skill when the user wants to:
-- Check the current price of a specific token
-- Get a market overview of the Solana ecosystem
-- Compare token prices
-- Understand current market conditions
+- 用户问代币价格（"SOL 多少钱"）
+- 用户想看整体市场行情
+- 用户提到"价格"、"行情"、"市场"、"多少钱"
 
-## Common User Phrases (Chinese & English)
+## Workflow
 
-- "SOL 多少钱" / "SOL price" / "how much is SOL"
-- "市场行情" / "market overview"
-- "今天市场怎么样" / "how's the market today"
-- "JUP 价格" / "JUP price"
+### 用户问某个代币的价格
+
+1. 从用户消息中提取代币名称
+2. `node skills/solana-market/scripts/get-price.js <SYMBOL>`
+   - 支持的代币：SOL、USDC、USDT、JUP、RAY、BONK
+3. 展示价格，并主动提供相关操作建议：
+   - "SOL 目前 $150。需要设置价格警报吗？"
+   - "JUP 目前 $0.82。要看看你持有多少吗？"
+
+### 用户想看市场概览
+
+1. `node skills/solana-market/scripts/market-overview.js`
+2. 展示所有代币价格列表
+3. 如果用户已连接钱包，可以主动建议："要看看你的持仓在这个行情下的表现吗？"
+
+### 代币不支持时
+
+如果用户查询的代币不在支持列表中，友善告知：
+> "目前支持查询 SOL、USDC、USDT、JUP、RAY、BONK 的价格。你想查哪个？"
+
+## Guardrails
+
+- **不预测走势** — 不说"看起来要涨/跌了"
+- **数据来源透明** — 可以告知用户"价格来自 CoinGecko"
+- **不推荐交易** — 展示价格后不建议买入/卖出
+- **缓存说明** — 如果用户反复查询相同代币，告知价格有 30 秒缓存
 
 ## Available Scripts
 
-### Get Token Price
-```bash
-node skills/solana-market/scripts/get-price.js <token_symbol>
-```
-- `token_symbol`: SOL, JUP, BONK, RAY, USDC, USDT
-- Returns: Current USD price from CoinGecko
-
-Example: `node skills/solana-market/scripts/get-price.js SOL`
-
-### Market Overview
-```bash
-node skills/solana-market/scripts/market-overview.js
-```
-Returns prices for all major Solana ecosystem tokens (SOL, USDC, USDT, JUP, RAY, BONK).
-
-## Formatting Guidelines
-- Format prices as USD: $123.45
-- For very small prices (< $0.01): show 6 decimal places
-- For large prices (> $1000): use $1.23K format
-- Always include the token symbol in the response
-- Default to Chinese output; use `--lang en` for English
-
-## Important Notes
-- Price data from CoinGecko free API (no API key required)
-- Prices cached for 30 seconds to reduce API calls
-- Supported tokens: SOL, USDC, USDT, JUP, RAY, BONK
+| 脚本 | 用途 | 参数 |
+|------|------|------|
+| `get-price.js` | 查询价格 | `<SYMBOL> [--lang en]` |
+| `market-overview.js` | 市场概览 | `[--lang en]` |
