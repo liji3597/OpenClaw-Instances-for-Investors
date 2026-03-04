@@ -17,7 +17,9 @@
       "WebFetch(domain:lumadock.com)",
       "mcp__contextweaver__codebase-retrieval",
       "Bash(C:/Users/asd10/.claude/bin/codeagent-wrapper.exe --backend:*)",
-      "mcp__codex__codex"
+      "mcp__codex__codex",
+      "mcp__codex__codex-reply",
+      "Bash(npm test)"
     ]
   }
 }

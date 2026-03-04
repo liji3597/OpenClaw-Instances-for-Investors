@@ -9,6 +9,10 @@ let db = null;
  * Initialize SQLite database and create tables
  */
 function initDatabase() {
+    if (db) {
+        return db;
+    }
+
     const dbDir = path.dirname(config.databasePath);
     if (!fs.existsSync(dbDir)) {
         fs.mkdirSync(dbDir, { recursive: true });

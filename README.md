@@ -8,9 +8,9 @@
   </p>
   <p align="center">
     <a href="https://www.npmjs.com/package/openclaw-investor-suite"><img src="https://img.shields.io/npm/v/openclaw-investor-suite?color=CB3837&logo=npm" alt="npm"></a>
+    <img src="https://img.shields.io/badge/vulnerabilities-0-brightgreen" alt="0 vulnerabilities">
     <img src="https://img.shields.io/badge/OpenClaw-Skills-FF6B35" alt="OpenClaw">
     <img src="https://img.shields.io/badge/Solana-Devnet%20%7C%20Mainnet-9945FF?logo=solana" alt="Solana">
-    <img src="https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram" alt="Telegram">
     <img src="https://img.shields.io/badge/License-MIT-blue" alt="MIT">
   </p>
 </p>
@@ -45,14 +45,21 @@ User (Telegram) → OpenClaw (LLM) → Our Skills → Solana blockchain
 ├── AGENTS.md                           # Agent personality & behavior rules
 ├── .env.example                        # Environment variables template
 ├── package.json                        # npm dependencies
-├── shared/                             # Shared modules (7 files)
+├── shared/                             # Shared modules
 │   ├── config.js                       # Environment config & token registry
 │   ├── database.js                     # SQLite (users, wallets, alerts, strategies)
+│   ├── errors.js                       # Bilingual error codes (中文/EN)
 │   ├── solana-connection.js            # Solana RPC with retry logic
 │   ├── wallet.js                       # Balance queries & multi-wallet aggregation
 │   ├── price-service.js                # CoinGecko price API with caching
 │   ├── tracker.js                      # Portfolio valuation engine
-│   └── formatter.js                    # Bilingual output formatting (中文/EN)
+│   ├── formatter.js                    # Bilingual output formatting (中文/EN)
+│   ├── script-utils.js                 # Parameter validation utilities
+│   └── services/                       # Service layer (authorization + business logic)
+│       ├── index.js                    # Aggregated exports
+│       ├── user-context.js             # User context & wallet operations
+│       ├── strategy-service.js         # DCA strategy CRUD with ownership checks
+│       └── alert-service.js            # Alert CRUD with scope separation
 └── skills/                             # OpenClaw Skills (prompt-centric)
     ├── solana-investor/                # 🦅 Orchestrator (pure prompt, no scripts)
     │   └── SKILL.md
@@ -221,7 +228,10 @@ OpenClaw injects these into the LLM context. The LLM reads the **Workflow** to d
 
 - **Non-custodial** — Skills never access or store private keys
 - **Read-only** — Only reads public on-chain balances
-- **DCA simulation** — MVP uses Jupiter quotes (no real swaps without private key)
+- **0 vulnerabilities** — Removed `@solana/spl-token` transitive dependency (CVE-2025-3194 bigint-buffer)
+- **System-authorized calls** — Sensitive scripts require `--system` flag or `OPENCLAW_SYSTEM=true`
+- **Structured error handling** — Scripts return `MISSING_PARAMS` JSON instead of raw errors
+- **DCA simulation** — MVP records strategies but does not execute real on-chain swaps
 - **Local database** — SQLite stored on your server, not exposed externally
 
 ## License
@@ -354,11 +364,27 @@ nano .env   # 填入 HELIUS_API_KEY
 
 - **非托管** — 技能绝不访问或存储私钥
 - **只读** — 只读取链上公开余额数据
-- **DCA 模拟** — MVP 使用 Jupiter 报价（不实际执行交换）
+- **0 漏洞** — 已移除 `@solana/spl-token` 依赖链（CVE-2025-3194 bigint-buffer 缓冲区溢出）
+- **系统授权** — 敏感脚本需要 `--system` 标志或 `OPENCLAW_SYSTEM=true`
+- **结构化错误** — 脚本返回 `MISSING_PARAMS` JSON，不暴露原始错误
+- **DCA 模拟** — MVP 记录策略但不实际执行链上交换
 - **本地数据库** — SQLite 存储在你的服务器上
 
 ## 路线图
 
+### P0 — 安全加固 ✅
+- [x] 授权绕过修复（DCA 策略操作 + 警报范围分离）
+- [x] 原子警报触发（防止重复触发）
+- [x] 系统授权门控（敏感脚本需 `--system` 标志）
+- [x] CVE-2025-3194 修复（移除 bigint-buffer 依赖链）
+
+### P1 — 架构优化 ✅
+- [x] Service 层（用户上下文 / 策略 / 警报 / 钱包操作）
+- [x] 双语错误码标准化（`formatError` + `errors.js`）
+- [x] `MISSING_PARAMS` JSON 协议（Agent 追问而非报错）
+- [x] 全部脚本适配新架构（14 个脚本）
+
+### P2 — 标准化与工程底座 🔧
 - [x] 多钱包投资组合追踪
 - [x] DCA 定投策略引擎
 - [x] 价格警报系统
@@ -366,11 +392,22 @@ nano .env   # 填入 HELIUS_API_KEY
 - [x] 中英文双语支持
 - [x] Prompt-Centric SKILL.md（Workflow + Guardrails）
 - [x] 多技能编排器（Orchestrator Skill）
+- [ ] 测试基线（Service 层单测 + 脚本协议测试）
+- [ ] CI 流水线（GitHub Actions）
+
+### P3 — 产品能力扩展（保持非托管/模拟模式）
+- [ ] 推送通知（警报触发 → Telegram DM）
 - [ ] PnL 盈亏追踪（成本基础、已实现/未实现盈亏）
-- [ ] 智能再平衡策略
-- [ ] 止损/止盈功能
+- [ ] 风险数据源（RugCheck API 集成）
+- [ ] 定时调度层（alerts 检查 + DCA 模拟执行）
+- [ ] 结构化日志与监控
+
+### P4 — 策略智能化（模式分叉点）
+- [ ] 止损/止盈提醒（提醒型，非自动执行）
+- [ ] 智能再平衡建议
 - [ ] 鲸鱼追踪（大额转账监控）
-- [ ] 风险预警（RugCheck 集成）
+- [ ] Token 扩展（Jupiter Price API）
+- [ ] 执行模式评估（签名/托管/合规可行性报告）
 
 ## 开源协议
 
