@@ -6,10 +6,8 @@
 const path = require('path');
 const sharedDir = path.resolve(__dirname, '..', '..', '..', 'shared');
 
-const { getActiveAlertsForSystem, markAlertTriggeredOnce } = require(path.join(sharedDir, 'services'));
+const { runAlertCheck } = require(path.join(sharedDir, 'scheduler'));
 const { formatError } = require(path.join(sharedDir, 'errors'));
-const { getTokenPrice } = require(path.join(sharedDir, 'price-service'));
-const { formatUSD } = require(path.join(sharedDir, 'formatter'));
 
 const lang = process.argv.includes('--lang') ? process.argv[process.argv.indexOf('--lang') + 1] : 'zh';
 
@@ -20,33 +18,32 @@ async function main() {
         process.exit(1);
     }
 
-    if (typeof getActiveAlertsForSystem !== 'function' || typeof markAlertTriggeredOnce !== 'function') {
+    if (typeof runAlertCheck !== 'function') {
         console.log(`❌ ${formatError('INTERNAL_ERROR', lang)}`);
         process.exit(1);
     }
 
-    const alerts = getActiveAlertsForSystem();
-    if (!alerts || alerts.length === 0) {
+    const summary = await runAlertCheck();
+    if (!summary || summary.checked === 0) {
         console.log('📭 暂无活跃警报 / No active alerts');
         process.exit(0);
     }
 
-    for (const alert of alerts) {
-        const price = await getTokenPrice(alert.token_mint || alert.token_symbol);
-        if (!Number.isFinite(price) || price <= 0) continue;
-
-        const triggered = alert.condition === 'above'
-            ? price >= alert.target_price
-            : price <= alert.target_price;
-
-        if (!triggered) continue;
-
-        const marked = markAlertTriggeredOnce(alert.id);
-        if (!marked) continue;
-
-        const condStr = alert.condition === 'above' ? '高于 / above' : '低于 / below';
-        console.log(`🚨 TRIGGERED: ${alert.token_symbol} ${condStr} ${formatUSD(alert.target_price)} (current: ${formatUSD(price)})`);
+    if (summary.triggered === 0) {
+        console.log(`✅ ${lang === 'zh' ? '已检查，暂无触发警报' : 'Checked, no alerts triggered'}`);
+        process.exit(0);
     }
+
+    for (const item of summary.triggeredAlerts || []) {
+        const condStr = item.condition === 'above' ? '高于 / above' : '低于 / below';
+        console.log(
+            `🚨 TRIGGERED: ${item.symbol} ${condStr} ${item.targetPrice} (current: ${item.currentPrice})`
+        );
+    }
+
+    console.log(
+        `✅ ${lang === 'zh' ? `本次触发 ${summary.triggered} 条，已通知 ${summary.notified} 位用户` : `Triggered ${summary.triggered}, notified ${summary.notified} users`}`
+    );
 }
 
 main().catch((err) => {

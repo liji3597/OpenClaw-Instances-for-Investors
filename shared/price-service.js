@@ -1,5 +1,10 @@
 const axios = require('axios');
 const config = require('./config');
+const { createLogger } = require('./logger');
+const { recordMetric } = require('./metrics');
+const { getTokenRiskReport, formatRiskLabel, isHighRisk } = require('./risk-service');
+
+const logger = createLogger('price-service');
 
 // In-memory price cache to reduce API calls
 const priceCache = new Map(); // mint → { price, timestamp }
@@ -82,6 +87,7 @@ async function getTokenPrices(mints) {
  * Fetch prices from CoinGecko using known coin IDs (most reliable)
  */
 async function fetchFromCoinGecko(mints, result, now) {
+    const startedAt = Date.now();
     try {
         // Map mints to CoinGecko IDs
         const idMap = new Map(); // coingecko_id → mint
@@ -106,6 +112,10 @@ async function fetchFromCoinGecko(mints, result, now) {
                 timeout: 10000,
             }
         );
+        recordMetric('api.latency.ms', Date.now() - startedAt, {
+            provider: 'coingecko',
+            endpoint: '/simple/price',
+        });
 
         const data = response.data || {};
         let found = false;
@@ -128,7 +138,13 @@ async function fetchFromCoinGecko(mints, result, now) {
 
         return found;
     } catch (err) {
-        console.error('CoinGecko price API error:', err.message);
+        recordMetric('api.latency.ms', Date.now() - startedAt, {
+            provider: 'coingecko',
+            endpoint: '/simple/price',
+            status: 'error',
+        });
+        recordMetric('error.total', 1, { component: 'price-service', scope: 'coingecko_simple' });
+        logger.warn('CoinGecko simple price API error', { reason: err.message });
         return false;
     }
 }
@@ -137,6 +153,7 @@ async function fetchFromCoinGecko(mints, result, now) {
  * Fallback: fetch prices from CoinGecko using Solana contract addresses
  */
 async function fetchFromCoinGeckoContract(mints, result, now) {
+    const startedAt = Date.now();
     try {
         const contractAddresses = mints.join(',');
         const response = await axios.get(
@@ -149,6 +166,10 @@ async function fetchFromCoinGeckoContract(mints, result, now) {
                 timeout: 10000,
             }
         );
+        recordMetric('api.latency.ms', Date.now() - startedAt, {
+            provider: 'coingecko',
+            endpoint: '/simple/token_price/solana',
+        });
 
         const data = response.data || {};
         let found = false;
@@ -165,7 +186,13 @@ async function fetchFromCoinGeckoContract(mints, result, now) {
 
         return found;
     } catch (err) {
-        console.error('CoinGecko contract price fallback error:', err.message);
+        recordMetric('api.latency.ms', Date.now() - startedAt, {
+            provider: 'coingecko',
+            endpoint: '/simple/token_price/solana',
+            status: 'error',
+        });
+        recordMetric('error.total', 1, { component: 'price-service', scope: 'coingecko_contract' });
+        logger.warn('CoinGecko contract fallback API error', { reason: err.message });
         for (const mint of mints) {
             if (!result.has(mint)) result.set(mint, 0);
         }
@@ -174,13 +201,40 @@ async function fetchFromCoinGeckoContract(mints, result, now) {
 }
 
 /**
- * Get price for a single token
+ * Get price for a single token.
+ * By default returns number for backward compatibility.
+ * Pass { includeRisk: true } to receive price + RugCheck risk data.
  */
-async function getTokenPrice(mintOrSymbol) {
+async function getTokenPrice(mintOrSymbol, options = {}) {
     const mint = resolveToken(mintOrSymbol);
-    if (!mint) return 0;
+    const includeRisk = Boolean(options.includeRisk);
+
+    if (!mint) {
+        return includeRisk
+            ? {
+                mint: null,
+                symbol: String(mintOrSymbol || '').toUpperCase(),
+                price: 0,
+                risk: null,
+                riskLabel: null,
+                highRisk: false,
+            }
+            : 0;
+    }
+
     const prices = await getTokenPrices([mint]);
-    return prices.get(mint) || 0;
+    const price = prices.get(mint) || 0;
+    if (!includeRisk) return price;
+
+    const report = await getTokenRiskReport(mint);
+    return {
+        mint,
+        symbol: mintToSymbol(mint),
+        price,
+        risk: report,
+        riskLabel: report ? formatRiskLabel(report.score) : null,
+        highRisk: report ? isHighRisk(report) : false,
+    };
 }
 
 /**

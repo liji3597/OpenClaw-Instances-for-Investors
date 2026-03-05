@@ -93,10 +93,24 @@ function initDatabase() {
       FOREIGN KEY (strategy_id) REFERENCES dca_strategies(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS cost_basis (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token_symbol TEXT NOT NULL,
+      total_amount REAL DEFAULT 0,
+      total_cost_usd REAL DEFAULT 0,
+      avg_cost_basis REAL DEFAULT 0,
+      realized_pnl REAL DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, token_symbol)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
     CREATE INDEX IF NOT EXISTS idx_alerts_user ON price_alerts(user_id, is_active);
     CREATE INDEX IF NOT EXISTS idx_dca_status ON dca_strategies(status);
     CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_cost_basis_user_symbol ON cost_basis(user_id, token_symbol);
   `);
 
     console.log('✅ Database initialized');
@@ -172,7 +186,12 @@ function getActiveAlerts(userId) {
 }
 
 function getActiveAlertsForSystem() {
-    return getDb().prepare('SELECT * FROM price_alerts WHERE is_active = 1').all();
+    return getDb().prepare(
+        `SELECT pa.*, u.telegram_id, u.language
+         FROM price_alerts pa
+         JOIN users u ON pa.user_id = u.id
+         WHERE pa.is_active = 1`
+    ).all();
 }
 
 function markAlertTriggeredOnce(alertId) {

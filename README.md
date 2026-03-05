@@ -33,11 +33,11 @@ User (Telegram) → OpenClaw (LLM) → Our Skills → Solana blockchain
 
 | Skill | Description | Scripts |
 |-------|-------------|---------|
-| 🦅 **solana-investor** | Top-level orchestrator — coordinates multi-skill requests | *(no scripts — pure prompt)* |
+| 🦅 **solana-investor** | Top-level orchestrator — coordinates multi-skill requests | `get-metrics` |
 | 💼 **solana-portfolio** | Multi-wallet portfolio tracking & asset distribution | `get-portfolio`, `add-wallet`, `list-wallets`, `remove-wallet` |
 | 📈 **solana-dca** | Dollar-Cost Averaging strategy engine | `create-dca`, `list-strategies`, `pause-strategy`, `resume-strategy` |
 | 🔔 **solana-alerts** | Price alert monitoring & notifications | `create-alert`, `list-alerts`, `delete-alert`, `check-prices` |
-| 💲 **solana-market** | Token price queries & ecosystem overview | `get-price`, `market-overview` |
+| 💲 **solana-market** | Token price queries, ecosystem overview & RugCheck risk scan | `get-price`, `market-overview`, `check-token-risk` |
 
 ## Project Structure
 
@@ -51,7 +51,10 @@ User (Telegram) → OpenClaw (LLM) → Our Skills → Solana blockchain
 │   ├── errors.js                       # Bilingual error codes (中文/EN)
 │   ├── solana-connection.js            # Solana RPC with retry logic
 │   ├── wallet.js                       # Balance queries & multi-wallet aggregation
-│   ├── price-service.js                # CoinGecko price API with caching
+│   ├── price-service.js                # CoinGecko price API + optional RugCheck risk data
+│   ├── risk-service.js                 # RugCheck risk report API with 1h cache
+│   ├── logger.js                       # Structured JSON logger
+│   ├── metrics.js                      # 24h in-memory metrics summary
 │   ├── tracker.js                      # Portfolio valuation engine
 │   ├── formatter.js                    # Bilingual output formatting (中文/EN)
 │   ├── script-utils.js                 # Parameter validation utilities
@@ -61,7 +64,7 @@ User (Telegram) → OpenClaw (LLM) → Our Skills → Solana blockchain
 │       ├── strategy-service.js         # DCA strategy CRUD with ownership checks
 │       └── alert-service.js            # Alert CRUD with scope separation
 └── skills/                             # OpenClaw Skills (prompt-centric)
-    ├── solana-investor/                # 🦅 Orchestrator (pure prompt, no scripts)
+    ├── solana-investor/                # 🦅 Orchestrator + monitoring utility scripts
     │   └── SKILL.md
     ├── solana-portfolio/
     │   ├── SKILL.md                    # Workflow + Guardrails + metadata
@@ -139,8 +142,8 @@ Open Telegram and chat with your OpenClaw bot:
 | `SOLANA_NETWORK` | Optional | `devnet` (default) or `mainnet-beta` |
 | `DEFAULT_SLIPPAGE_BPS` | Optional | DCA slippage tolerance, default 50 (0.5%) |
 | `DATABASE_PATH` | Optional | SQLite database path (default: `./data/openclaw.db`) |
-
-> **Note:** `TELEGRAM_BOT_TOKEN` is managed by OpenClaw itself — you don't need to set it here.
+| `TELEGRAM_BOT_TOKEN` | Required for push notifications | Telegram bot token for alert/DCA delivery |
+| `LOG_LEVEL` | Optional | Logger level: `DEBUG`, `INFO`, `WARN`, `ERROR` (default: `INFO`) |
 
 ## How It Works
 
@@ -233,6 +236,47 @@ OpenClaw injects these into the LLM context. The LLM reads the **Workflow** to d
 - **Structured error handling** — Scripts return `MISSING_PARAMS` JSON instead of raw errors
 - **DCA simulation** — MVP records strategies but does not execute real on-chain swaps
 - **Local database** — SQLite stored on your server, not exposed externally
+- **RugCheck risk feed** — Price flow supports score/warnings/top-holder risk data
+- **Operational observability** — Structured JSON logs and 24h metrics summary
+
+## Roadmap
+
+### P0 — Security Hardening ✅
+- [x] Authorization bypass fix (DCA strategy operations + alert scope separation)
+- [x] Atomic alert triggering (prevent duplicate triggers)
+- [x] System authorization gating (sensitive scripts require `--system` flag)
+- [x] CVE-2025-3194 fix (removed bigint-buffer dependency chain)
+
+### P1 — Architecture Optimization ✅
+- [x] Service layer (user context / strategy / alert / wallet operations)
+- [x] Bilingual error code standardization (`formatError` + `errors.js`)
+- [x] `MISSING_PARAMS` JSON protocol (Agent asks follow-up instead of throwing errors)
+- [x] All scripts adapted to new architecture (14 scripts)
+
+### P2 — Standardization & Engineering Foundation ✅
+- [x] Multi-wallet portfolio tracking
+- [x] DCA strategy engine
+- [x] Price alert system
+- [x] CoinGecko price data integration
+- [x] Bilingual support (Chinese & English)
+- [x] Prompt-Centric SKILL.md (Workflow + Guardrails)
+- [x] Multi-skill Orchestrator (Orchestrator Skill)
+- [x] Test baseline (Service layer unit tests + script protocol tests)
+- [x] CI pipeline (GitHub Actions)
+
+### P3 — Product Capability Expansion (non-custodial / simulation mode) ✅
+- [x] Push notifications (alert trigger → Telegram DM)
+- [x] PnL tracking (cost basis, realized/unrealized PnL)
+- [x] Risk data source (RugCheck API integration)
+- [x] Scheduled execution layer (alerts check + DCA simulated execution)
+- [x] Structured logging & monitoring
+
+### P4 — Strategy Intelligence (mode fork point)
+- [ ] Stop-loss / take-profit alerts (notification-only, not auto-execution)
+- [ ] Smart rebalancing suggestions
+- [ ] Whale tracking (large transfer monitoring)
+- [ ] Token expansion (Jupiter Price API)
+- [ ] Execution mode evaluation (signature/custody/compliance feasibility report)
 
 ## License
 
@@ -256,11 +300,11 @@ MIT
 
 | 技能 | 说明 | 脚本 |
 |------|------|------|
-| 🦅 **solana-investor** | 顶层编排器 — 协调多技能组合请求 | *（纯 Prompt，无脚本）* |
+| 🦅 **solana-investor** | 顶层编排器 — 协调多技能组合请求 | `get-metrics` |
 | 💼 **solana-portfolio** | 多钱包投资组合追踪和资产分布 | `get-portfolio`, `add-wallet`, `list-wallets`, `remove-wallet` |
 | 📈 **solana-dca** | DCA 定投策略引擎 | `create-dca`, `list-strategies`, `pause-strategy`, `resume-strategy` |
 | 🔔 **solana-alerts** | 价格警报监控和通知 | `create-alert`, `list-alerts`, `delete-alert`, `check-prices` |
-| 💲 **solana-market** | 代币价格查询和生态概览 | `get-price`, `market-overview` |
+| 💲 **solana-market** | 代币价格查询、生态概览与 RugCheck 风险扫描 | `get-price`, `market-overview`, `check-token-risk` |
 
 ## 快速开始
 
@@ -357,8 +401,8 @@ nano .env   # 填入 HELIUS_API_KEY
 | `SOLANA_NETWORK` | 可选 | `devnet`（默认）或 `mainnet-beta` |
 | `DEFAULT_SLIPPAGE_BPS` | 可选 | DCA 滑点容差，默认 50（0.5%） |
 | `DATABASE_PATH` | 可选 | SQLite 数据库路径 |
-
-> **注意：** Telegram Bot Token 由 OpenClaw 管理，不需要在这里配置。
+| `TELEGRAM_BOT_TOKEN` | 推送通知必填 | Telegram Bot Token，用于警报与定投执行通知 |
+| `LOG_LEVEL` | 可选 | 日志级别：`DEBUG`、`INFO`、`WARN`、`ERROR`（默认 `INFO`） |
 
 ## 安全说明
 
@@ -369,6 +413,8 @@ nano .env   # 填入 HELIUS_API_KEY
 - **结构化错误** — 脚本返回 `MISSING_PARAMS` JSON，不暴露原始错误
 - **DCA 模拟** — MVP 记录策略但不实际执行链上交换
 - **本地数据库** — SQLite 存储在你的服务器上
+- **RugCheck 风险源** — 价格链路可返回风险评分、警告和持仓集中度
+- **可观测性** — 结构化 JSON 日志 + 24 小时指标汇总
 
 ## 路线图
 
@@ -384,7 +430,7 @@ nano .env   # 填入 HELIUS_API_KEY
 - [x] `MISSING_PARAMS` JSON 协议（Agent 追问而非报错）
 - [x] 全部脚本适配新架构（14 个脚本）
 
-### P2 — 标准化与工程底座 🔧
+### P2 — 标准化与工程底座 ✅
 - [x] 多钱包投资组合追踪
 - [x] DCA 定投策略引擎
 - [x] 价格警报系统
@@ -392,15 +438,15 @@ nano .env   # 填入 HELIUS_API_KEY
 - [x] 中英文双语支持
 - [x] Prompt-Centric SKILL.md（Workflow + Guardrails）
 - [x] 多技能编排器（Orchestrator Skill）
-- [ ] 测试基线（Service 层单测 + 脚本协议测试）
-- [ ] CI 流水线（GitHub Actions）
+- [x] 测试基线（Service 层单测 + 脚本协议测试）
+- [x] CI 流水线（GitHub Actions）
 
 ### P3 — 产品能力扩展（保持非托管/模拟模式）
-- [ ] 推送通知（警报触发 → Telegram DM）
-- [ ] PnL 盈亏追踪（成本基础、已实现/未实现盈亏）
-- [ ] 风险数据源（RugCheck API 集成）
-- [ ] 定时调度层（alerts 检查 + DCA 模拟执行）
-- [ ] 结构化日志与监控
+- [x] 推送通知（警报触发 → Telegram DM）
+- [x] PnL 盈亏追踪（成本基础、已实现/未实现盈亏）
+- [x] 风险数据源（RugCheck API 集成）
+- [x] 定时调度层（alerts 检查 + DCA 模拟执行）
+- [x] 结构化日志与监控
 
 ### P4 — 策略智能化（模式分叉点）
 - [ ] 止损/止盈提醒（提醒型，非自动执行）
