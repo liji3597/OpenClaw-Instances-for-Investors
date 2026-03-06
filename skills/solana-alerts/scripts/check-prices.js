@@ -35,7 +35,9 @@ async function main() {
     }
 
     for (const item of summary.triggeredAlerts || []) {
-        const condStr = item.condition === 'above' ? '高于 / above' : '低于 / below';
+        let condStr = item.condition === 'above' ? '高于 / above' : '低于 / below';
+        if (item.alertType === 'stop_loss') condStr = '止损 / stop-loss';
+        if (item.alertType === 'take_profit') condStr = '止盈 / take-profit';
         console.log(
             `🚨 TRIGGERED: ${item.symbol} ${condStr} ${item.targetPrice} (current: ${item.currentPrice})`
         );

@@ -3,6 +3,7 @@ const config = require('./config');
 const { createLogger } = require('./logger');
 const { recordMetric } = require('./metrics');
 const { getTokenRiskReport, formatRiskLabel, isHighRisk } = require('./risk-service');
+const { fetchJupiterPrices } = require('./jupiter-client');
 
 const logger = createLogger('price-service');
 
@@ -19,12 +20,6 @@ const MINT_TO_COINGECKO_ID = {
     '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R': 'raydium',
     'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'bonk',
 };
-
-// Reverse map for CoinGecko responses
-const COINGECKO_ID_TO_MINT = {};
-for (const [mint, id] of Object.entries(MINT_TO_COINGECKO_ID)) {
-    COINGECKO_ID_TO_MINT[id] = mint;
-}
 
 /**
  * Resolve token symbol to mint address
@@ -72,12 +67,25 @@ async function getTokenPrices(mints) {
 
     if (uncached.length === 0) return result;
 
-    // Try CoinGecko first (free, no API key needed)
-    const ok = await fetchFromCoinGecko(uncached, result, now);
+    // 1) CoinGecko known IDs (most stable for majors)
+    await fetchFromCoinGecko(uncached, result, now);
 
-    // Fallback: try Jupiter token price via contract addresses
-    if (!ok) {
-        await fetchFromCoinGeckoContract(uncached, result, now);
+    // 2) Jupiter Price API for unresolved mints
+    let unresolved = uncached.filter((mint) => !(Number(result.get(mint)) > 0));
+    if (unresolved.length > 0) {
+        await fetchFromJupiter(unresolved, result, now);
+    }
+
+    // 3) CoinGecko contract fallback as final attempt
+    unresolved = uncached.filter((mint) => !(Number(result.get(mint)) > 0));
+    if (unresolved.length > 0) {
+        await fetchFromCoinGeckoContract(unresolved, result, now);
+    }
+
+    for (const mint of uncached) {
+        if (!result.has(mint)) {
+            result.set(mint, 0);
+        }
     }
 
     return result;
@@ -97,8 +105,8 @@ async function fetchFromCoinGecko(mints, result, now) {
         }
 
         if (idMap.size === 0) {
-            // No known CoinGecko IDs, try contract address method
-            return await fetchFromCoinGeckoContract(mints, result, now);
+            // No mapped IDs found; caller will try other providers.
+            return false;
         }
 
         const ids = [...idMap.keys()].join(',');
@@ -129,13 +137,6 @@ async function fetchFromCoinGecko(mints, result, now) {
             }
         }
 
-        // Handle any mints without CoinGecko IDs
-        for (const mint of mints) {
-            if (!result.has(mint)) {
-                result.set(mint, 0);
-            }
-        }
-
         return found;
     } catch (err) {
         recordMetric('api.latency.ms', Date.now() - startedAt, {
@@ -145,6 +146,29 @@ async function fetchFromCoinGecko(mints, result, now) {
         });
         recordMetric('error.total', 1, { component: 'price-service', scope: 'coingecko_simple' });
         logger.warn('CoinGecko simple price API error', { reason: err.message });
+        return false;
+    }
+}
+
+/**
+ * Fallback: fetch prices from Jupiter lite Price API.
+ */
+async function fetchFromJupiter(mints, result, now) {
+    try {
+        const jupiterPrices = await fetchJupiterPrices(mints, { timeoutMs: 10_000 });
+        let found = false;
+        for (const mint of mints) {
+            const price = Number(jupiterPrices.get(mint) || 0);
+            if (price > 0) {
+                result.set(mint, price);
+                priceCache.set(mint, { price, timestamp: now });
+                found = true;
+            }
+        }
+        return found;
+    } catch (err) {
+        recordMetric('error.total', 1, { component: 'price-service', scope: 'jupiter_fallback' });
+        logger.warn('Jupiter fallback API error', { reason: err.message });
         return false;
     }
 }

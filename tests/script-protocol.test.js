@@ -10,10 +10,14 @@ const scriptsToCheck = [
     { name: 'pause-strategy', relPath: 'skills/solana-dca/scripts/pause-strategy.js' },
     { name: 'resume-strategy', relPath: 'skills/solana-dca/scripts/resume-strategy.js' },
     { name: 'create-alert', relPath: 'skills/solana-alerts/scripts/create-alert.js' },
+    { name: 'create-stop-loss', relPath: 'skills/solana-alerts/scripts/create-stop-loss.js' },
+    { name: 'create-take-profit', relPath: 'skills/solana-alerts/scripts/create-take-profit.js' },
     { name: 'delete-alert', relPath: 'skills/solana-alerts/scripts/delete-alert.js' },
     { name: 'get-price', relPath: 'skills/solana-market/scripts/get-price.js' },
+    { name: 'track-whale', relPath: 'skills/solana-market/scripts/track-whale.js' },
     { name: 'add-wallet', relPath: 'skills/solana-portfolio/scripts/add-wallet.js' },
     { name: 'remove-wallet', relPath: 'skills/solana-portfolio/scripts/remove-wallet.js' },
+    { name: 'get-rebalance-suggestion', relPath: 'skills/solana-portfolio/scripts/get-rebalance-suggestion.js' },
 ];
 
 for (const script of scriptsToCheck) {

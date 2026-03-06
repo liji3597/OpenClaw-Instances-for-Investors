@@ -120,6 +120,20 @@ function formatStrategy(strategy, lang = 'zh') {
  */
 function formatAlert(alert, lang = 'zh') {
     const isZh = lang === 'zh';
+    const alertType = alert.alert_type || 'price';
+
+    if (alertType === 'stop_loss') {
+        return isZh
+            ? `🛑 #${alert.id}  *${alert.token_symbol}* 跌幅达到 ${Number(alert.target_price).toFixed(2)}%（基于成本价）`
+            : `🛑 #${alert.id}  *${alert.token_symbol}* drawdown reaches ${Number(alert.target_price).toFixed(2)}% (cost basis)`;
+    }
+
+    if (alertType === 'take_profit') {
+        return isZh
+            ? `🎯 #${alert.id}  *${alert.token_symbol}* 涨幅达到 ${Number(alert.target_price).toFixed(2)}%（基于成本价）`
+            : `🎯 #${alert.id}  *${alert.token_symbol}* gain reaches ${Number(alert.target_price).toFixed(2)}% (cost basis)`;
+    }
+
     const condStr = alert.condition === 'above'
         ? (isZh ? '高于' : 'above')
         : (isZh ? '低于' : 'below');

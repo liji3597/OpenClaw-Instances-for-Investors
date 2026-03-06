@@ -3,6 +3,7 @@ const {
     initDatabase,
     getActiveAlertsForSystem,
     markAlertTriggeredOnce,
+    getCostBasisByUserAndToken,
     getActiveStrategies,
     recordStrategyExecution,
     recordTransaction,
@@ -136,9 +137,35 @@ async function runAlertCheck() {
             if (!Number.isFinite(price) || price <= 0) continue;
 
             recordMetric('alert.check.total', 1, { component: 'scheduler' });
-            const triggered = alert.condition === 'above'
-                ? price >= alert.target_price
-                : price <= alert.target_price;
+            const alertType = alert.alert_type || 'price';
+            const threshold = Number(alert.target_price);
+            let triggered = false;
+            let avgCostBasis = null;
+            let pnlPercent = null;
+
+            if (alertType === 'stop_loss' || alertType === 'take_profit') {
+                const costBasis = getCostBasisByUserAndToken(
+                    alert.user_id,
+                    String(alert.token_symbol || '').toUpperCase()
+                );
+                avgCostBasis = Number(costBasis?.avg_cost_basis || 0);
+                if (!Number.isFinite(avgCostBasis) || avgCostBasis <= 0) {
+                    continue;
+                }
+
+                pnlPercent = ((price - avgCostBasis) / avgCostBasis) * 100;
+                if (!Number.isFinite(pnlPercent)) continue;
+
+                if (alertType === 'stop_loss') {
+                    triggered = pnlPercent <= -Math.abs(threshold);
+                } else {
+                    triggered = pnlPercent >= Math.abs(threshold);
+                }
+            } else {
+                triggered = alert.condition === 'above'
+                    ? price >= alert.target_price
+                    : price <= alert.target_price;
+            }
             if (!triggered) continue;
 
             const marked = markAlertTriggeredOnce(alert.id);
@@ -149,25 +176,37 @@ async function runAlertCheck() {
                 id: alert.id,
                 symbol: alert.token_symbol,
                 condition: alert.condition,
+                alertType,
                 targetPrice: alert.target_price,
                 currentPrice: price,
+                avgCostBasis,
+                pnlPercent,
             });
             recordMetric('alert.trigger.total', 1, {
                 component: 'scheduler',
                 token: alert.token_symbol || 'UNKNOWN',
+                alertType,
             });
 
             logger.info('Alert triggered', {
                 alertId: alert.id,
                 symbol: alert.token_symbol,
+                alertType,
                 condition: alert.condition,
                 targetPrice: alert.target_price,
                 currentPrice: price,
+                avgCostBasis,
+                pnlPercent,
             });
 
             const notified = await sendAlertNotification(
                 alert.telegram_id,
-                { ...alert, triggered_at: new Date().toISOString() },
+                {
+                    ...alert,
+                    triggered_at: new Date().toISOString(),
+                    avg_cost_basis: avgCostBasis,
+                    pnl_percent: pnlPercent,
+                },
                 price
             );
             if (notified) {

@@ -16,12 +16,42 @@ function normalizeLang(lang) {
 function formatAlertMessage(alert, currentPrice, lang = 'zh') {
     const safeLang = normalizeLang(lang);
     const symbol = alert.token_symbol || 'UNKNOWN';
+    const alertType = alert.alert_type || 'price';
+    const thresholdPercent = Number(alert.target_price) || 0;
+    const avgCostBasis = Number(alert.avg_cost_basis) || 0;
+    const pnlPercent = Number(alert.pnl_percent);
     const conditionText = alert.condition === 'above'
         ? (safeLang === 'zh' ? '高于 / above' : 'above / 高于')
         : (safeLang === 'zh' ? '低于 / below' : 'below / 低于');
     const targetPriceText = formatUSD(Number(alert.target_price) || 0);
     const currentPriceText = formatUSD(Number(currentPrice) || 0);
     const timestamp = alert.triggered_at || new Date().toISOString();
+
+    if (alertType === 'stop_loss') {
+        return [
+            '🛑 止损警报 / Stop-Loss Alert',
+            '',
+            `${symbol} ${safeLang === 'zh' ? '跌幅达到' : 'drawdown reached'} ${thresholdPercent.toFixed(2)}%`,
+            `${safeLang === 'zh' ? '成本价 / Avg Cost' : 'Avg Cost / 成本价'}: ${formatUSD(avgCostBasis)}`,
+            `${safeLang === 'zh' ? '当前价格 / Current' : 'Current / 当前价格'}: ${currentPriceText}`,
+            `${safeLang === 'zh' ? '收益率 / PnL' : 'PnL / 收益率'}: ${Number.isFinite(pnlPercent) ? `${pnlPercent.toFixed(2)}%` : '--'}`,
+            '',
+            `触发时间 / Triggered: ${timestamp}`,
+        ].join('\n');
+    }
+
+    if (alertType === 'take_profit') {
+        return [
+            '🎯 止盈警报 / Take-Profit Alert',
+            '',
+            `${symbol} ${safeLang === 'zh' ? '涨幅达到' : 'gain reached'} ${thresholdPercent.toFixed(2)}%`,
+            `${safeLang === 'zh' ? '成本价 / Avg Cost' : 'Avg Cost / 成本价'}: ${formatUSD(avgCostBasis)}`,
+            `${safeLang === 'zh' ? '当前价格 / Current' : 'Current / 当前价格'}: ${currentPriceText}`,
+            `${safeLang === 'zh' ? '收益率 / PnL' : 'PnL / 收益率'}: ${Number.isFinite(pnlPercent) ? `${pnlPercent.toFixed(2)}%` : '--'}`,
+            '',
+            `触发时间 / Triggered: ${timestamp}`,
+        ].join('\n');
+    }
 
     return [
         '🚨 价格警报 / Price Alert',

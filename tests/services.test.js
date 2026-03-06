@@ -169,3 +169,43 @@ test('alert-service: create validation, limit check, list and delete', () => {
         database.closeDatabase();
     }
 });
+
+test('alert-service: stop-loss/take-profit require cost basis and persist alert type', () => {
+    const { services, database } = loadFreshServices();
+
+    try {
+        const noCostBasis = services.createStopLossAlertForUser('risk-user', {
+            tokenSymbol: 'SOL',
+            lossPercent: 10,
+        });
+        assert.equal(noCostBasis.ok, false);
+        assert.equal(noCostBasis.code, 'COST_BASIS_NOT_FOUND');
+
+        const user = services.getUserContext('risk-user');
+        services.updateCostBasis(user.id, 'SOL', 2, 200);
+
+        const stopLoss = services.createStopLossAlertForUser('risk-user', {
+            tokenSymbol: 'SOL',
+            lossPercent: 12,
+        });
+        assert.equal(stopLoss.ok, true);
+        assert.equal(stopLoss.code, 'ALERT_CREATED');
+
+        const takeProfit = services.createTakeProfitAlertForUser('risk-user', {
+            tokenSymbol: 'SOL',
+            profitPercent: 30,
+        });
+        assert.equal(takeProfit.ok, true);
+        assert.equal(takeProfit.code, 'ALERT_CREATED');
+
+        const listed = services.listAlerts('risk-user');
+        assert.equal(listed.ok, true);
+        assert.equal(listed.alerts.length, 2);
+        assert.deepEqual(
+            listed.alerts.map((item) => item.alert_type).sort(),
+            ['stop_loss', 'take_profit']
+        );
+    } finally {
+        database.closeDatabase();
+    }
+});

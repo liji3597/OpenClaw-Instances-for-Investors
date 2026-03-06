@@ -150,34 +150,34 @@ Open Telegram and chat with your OpenClaw bot:
 ### Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│  Telegram                               │
-│  User: "每周定投 100 USDC 买 SOL"         │
-└─────────────┬───────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────┐
-│  OpenClaw Gateway                       │
-│  • LLM understands intent              │
-│  • Selects: solana-dca skill            │
-│  • Runs: create-dca.js 12345 SOL 100   │
-└─────────────┬───────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────┐
-│  Our Skills (this project)              │
-│  • Validates token & parameters         │
-│  • Creates DCA strategy in SQLite       │
-│  • Returns confirmation message         │
-└─────────────┬───────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────┐
-│  Solana Blockchain                      │
-│  • Helius RPC for balance queries       │
-│  • CoinGecko for price data             │
-│  • Jupiter for swap quotes              │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  Telegram                                        │
+│  User: "DCA 100 USDC into SOL weekly"            │
+└──────────────────┬───────────────────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────────────────┐
+│  OpenClaw Gateway                                │
+│  • LLM understands intent                        │
+│  • Selects: solana-dca skill                     │
+│  • Runs: create-dca.js 12345 SOL 100             │
+└──────────────────┬───────────────────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────────────────┐
+│  Our Skills (this project)                       │
+│  • Validates token & parameters                  │
+│  • Creates DCA strategy in SQLite                │
+│  • Returns confirmation message                  │
+└──────────────────┬───────────────────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────────────────┐
+│  Solana Blockchain                               │
+│  • Helius RPC for balance queries                │
+│  • CoinGecko for price data                      │
+│  • Jupiter for swap quotes                       │
+└──────────────────────────────────────────────────┘
 ```
 
 ### Bilingual Support
@@ -271,12 +271,12 @@ OpenClaw injects these into the LLM context. The LLM reads the **Workflow** to d
 - [x] Scheduled execution layer (alerts check + DCA simulated execution)
 - [x] Structured logging & monitoring
 
-### P4 — Strategy Intelligence (mode fork point)
-- [ ] Stop-loss / take-profit alerts (notification-only, not auto-execution)
-- [ ] Smart rebalancing suggestions
-- [ ] Whale tracking (large transfer monitoring)
-- [ ] Token expansion (Jupiter Price API)
-- [ ] Execution mode evaluation (signature/custody/compliance feasibility report)
+### P4 — Strategy Intelligence (mode fork point) ✅
+- [x] Stop-loss / take-profit alerts (notification-only, not auto-execution)
+- [x] Smart rebalancing suggestions
+- [x] Whale tracking (large transfer monitoring)
+- [x] Token expansion (Jupiter Price API)
+- [x] Execution mode evaluation (signature/custody/compliance feasibility report)
 
 ## License
 
@@ -448,12 +448,12 @@ nano .env   # 填入 HELIUS_API_KEY
 - [x] 定时调度层（alerts 检查 + DCA 模拟执行）
 - [x] 结构化日志与监控
 
-### P4 — 策略智能化（模式分叉点）
-- [ ] 止损/止盈提醒（提醒型，非自动执行）
-- [ ] 智能再平衡建议
-- [ ] 鲸鱼追踪（大额转账监控）
-- [ ] Token 扩展（Jupiter Price API）
-- [ ] 执行模式评估（签名/托管/合规可行性报告）
+### P4 — 策略智能化（模式分叉点）✅
+- [x] 止损/止盈提醒（提醒型，非自动执行）
+- [x] 智能再平衡建议
+- [x] 鲸鱼追踪（大额转账监控）
+- [x] Token 扩展（Jupiter Price API）
+- [x] 执行模式评估（签名/托管/合规可行性报告）
 
 ## 开源协议
 

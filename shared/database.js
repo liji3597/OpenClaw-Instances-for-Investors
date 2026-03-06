@@ -4,6 +4,7 @@ const fs = require('fs');
 const config = require('./config');
 
 let db = null;
+const ALLOWED_ALERT_TYPES = new Set(['price', 'stop_loss', 'take_profit']);
 
 /**
  * Initialize SQLite database and create tables
@@ -49,6 +50,7 @@ function initDatabase() {
       user_id INTEGER NOT NULL,
       token_symbol TEXT NOT NULL,
       token_mint TEXT NOT NULL,
+      alert_type TEXT NOT NULL DEFAULT 'price',
       condition TEXT NOT NULL CHECK(condition IN ('above', 'below')),
       target_price REAL NOT NULL,
       is_active INTEGER DEFAULT 1,
@@ -113,6 +115,13 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_cost_basis_user_symbol ON cost_basis(user_id, token_symbol);
   `);
 
+    // Lightweight migration for existing databases created before alert_type was introduced.
+    const alertColumns = getDb().prepare('PRAGMA table_info(price_alerts)').all();
+    if (!alertColumns.some((column) => column.name === 'alert_type')) {
+        getDb().exec("ALTER TABLE price_alerts ADD COLUMN alert_type TEXT NOT NULL DEFAULT 'price'");
+    }
+    getDb().exec('CREATE INDEX IF NOT EXISTS idx_alerts_type ON price_alerts(alert_type, is_active)');
+
     console.log('✅ Database initialized');
     return db;
 }
@@ -171,10 +180,17 @@ function removeWallet(userId, address) {
 
 // ===== Price Alert Operations =====
 
-function createAlert(userId, tokenSymbol, tokenMint, condition, targetPrice) {
+function createAlert(userId, tokenSymbol, tokenMint, condition, targetPrice, alertType = 'price') {
+    const normalizedAlertType = String(alertType || 'price').trim().toLowerCase();
+    if (!ALLOWED_ALERT_TYPES.has(normalizedAlertType)) {
+        throw new Error(`Invalid alert type: ${alertType}`);
+    }
+
     const result = getDb().prepare(
-        'INSERT INTO price_alerts (user_id, token_symbol, token_mint, condition, target_price) VALUES (?, ?, ?, ?, ?)'
-    ).run(userId, tokenSymbol, tokenMint, condition, targetPrice);
+        `INSERT INTO price_alerts
+         (user_id, token_symbol, token_mint, alert_type, condition, target_price)
+         VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(userId, tokenSymbol, tokenMint, normalizedAlertType, condition, targetPrice);
     return result.lastInsertRowid;
 }
 
@@ -256,6 +272,18 @@ function getUserTransactions(userId, limit = 20) {
     return getDb().prepare('SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit);
 }
 
+function getCostBasisByUserAndToken(userId, tokenSymbol) {
+    return getDb().prepare(
+        'SELECT * FROM cost_basis WHERE user_id = ? AND token_symbol = ?'
+    ).get(userId, tokenSymbol);
+}
+
+function getUserCostBasisRows(userId) {
+    return getDb().prepare(
+        'SELECT * FROM cost_basis WHERE user_id = ? ORDER BY total_cost_usd DESC'
+    ).all(userId);
+}
+
 function closeDatabase() {
     if (db) {
         db.close();
@@ -292,6 +320,9 @@ module.exports = {
     // Transactions
     recordTransaction,
     getUserTransactions,
+    // Cost basis
+    getCostBasisByUserAndToken,
+    getUserCostBasisRows,
     // Lifecycle
     closeDatabase,
 };
