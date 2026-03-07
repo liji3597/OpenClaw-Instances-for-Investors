@@ -25,7 +25,10 @@
       "Bash(echo:*)",
       "Bash(done)",
       "Bash(tasklist:*)",
-      "Bash(git apply:*)"
+      "Bash(git apply:*)",
+      "Bash(npm install)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
