@@ -1,6 +1,6 @@
 {
   "name": "openclaw-investor-suite",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Solana AI Investment Assistant Skills for OpenClaw — portfolio tracking, DCA strategies, price alerts & market intelligence",
   "bin": {
     "openclaw-investor-suite": "bin/setup.js"
