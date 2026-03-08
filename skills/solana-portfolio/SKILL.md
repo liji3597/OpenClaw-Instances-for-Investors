@@ -52,6 +52,11 @@ metadata:
 
 ## Guardrails
 
+### P5 Safety
+- **Private Key Protection** — NEVER ask for or accept private keys. P5 uses signed message protocol or hardware wallet integration.
+- **Mode Visibility** — Show "🔴 LIVE" or "🧪 SIM" at the top of every portfolio summary.
+
+### General Guardrails
 - **只读操作** — 查看余额不需要私钥，绝不要求用户提供
 - **最多 5 个钱包** — 超出时友善提示限制
 - **地址验证** — 添加前验证格式，无效时提示正确格式而非报错

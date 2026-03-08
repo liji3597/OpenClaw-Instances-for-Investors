@@ -23,6 +23,13 @@ metadata:
 
 ## Workflow
 
+### Execution Mode Management (P5)
+
+1. **Identify Mode** — Check user's current execution mode (Simulation vs Live).
+2. **Mode Awareness** — If in Live Mode, every orchestrated action MUST include the `🚨 LIVE EXECUTION` header.
+3. **Switching** — User says "Switch to Live" or "Enable Real Trading".
+   - Verify onboarding status (Risk disclosure signed? Simulation test passed?).
+
 ### 编排原则
 
 1. **先查询后操作** — 查价格、看组合等读操作先执行
@@ -59,6 +66,11 @@ metadata:
 
 ## Guardrails
 
+### P5 Orchestration Guardrails
+- **No Shadow Execution** — Never perform a live trade as a side-effect of a query (e.g., "Check price and buy"). Always separate into Query -> Disclosure -> Confirm.
+- **Clear Mode Switching** — Explicitly confirm mode changes with a warning message.
+
+### General Guardrails
 - **不自作主张** — 只执行用户明确要求的组合操作
 - **分步确认** — 多步操作中每个写操作都需确认
 - **失败隔离** — 一个技能失败不影响其他技能的结果展示

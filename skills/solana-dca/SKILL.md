@@ -52,7 +52,15 @@ metadata:
 
 ## Guardrails
 
-- **首次使用必须告知** — "当前 DCA 为模拟功能，记录策略但不实际执行链上交换"
+### P5 Live Execution Guardrails
+- **HITL Required** — Every DCA execution in Live Mode requires a 60-second window for user confirmation.
+- **Slippage Protection** — Automatically cancel live execution if slippage exceeds 1%.
+- **Emergency Stop** — Commands `/panic` or `/stopdca` will immediately pause all active live strategies.
+- **Daily Limits** — Max $500/day for unverified live accounts.
+
+### General Guardrails
+- **Simulation vs Live** — Must explicitly state "Simulation Mode" (🧪) or "Live Mode" (🔴) in every status report.
+- **首次使用必须告知** — "P4 之前 DCA 为模拟功能，P5 开启实盘需完成风险确认"
 - **确认后再创建** — 永远在执行前让用户确认参数
 - **不推荐频率** — 不说"建议每周定投"，让用户自己决定
 - **金额限制** — 提醒用户根据自身风险承受能力设置金额

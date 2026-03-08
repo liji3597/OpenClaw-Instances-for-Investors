@@ -1,0 +1,42 @@
+{
+  "en": {
+    "pre_execution_confirmation": {
+      "title": "🚨 LIVE EXECUTION WARNING 🚨",
+      "body": "You are about to execute a REAL transaction on Solana mainnet:\n• {action}: {amount_in} {token_in} → {amount_out} {token_out}\n• Slippage tolerance: {slippage}%\n• Network fee: ~{fee} SOL\n\n⚠️ Risk Warning: Cryptocurrency trading involves risk of loss.",
+      "confirm": "✅ Confirm",
+      "cancel": "❌ Cancel"
+    },
+    "post_execution_report": {
+      "title": "✅ Transaction Executed",
+      "body": "Tx Signature: {signature}\nStatus: {status}\nFill Price: {price} {pair}\nActual received: {received} {token}\n\n[View on Solscan]({url})"
+    },
+    "risk_circuit_breaker": {
+      "title": "⛔ Transaction Blocked by Risk Control",
+      "body": "Reason: {reason}\nYour 24h volume: ${current_volume}\nAttempted: ${attempted_volume}\n\nContact support to increase limits after KYC."
+    },
+    "onboarding": {
+      "disclosure": "📢 RISK DISCLOSURE\n\nTrading digital assets involves significant risk. Prices can be extremely volatile. Only trade with money you can afford to lose.",
+      "accept": "I Understand & Accept Risks"
+    }
+  },
+  "zh": {
+    "pre_execution_confirmation": {
+      "title": "🚨 实盘执行警告 🚨",
+      "body": "你即将在 Solana 主网执行一笔真实交易：\n• {action}: {amount_in} {token_in} → {amount_out} {token_out}\n• 滑点容差: {slippage}%\n• 网络费用: ~{fee} SOL\n\n⚠️ 风险提示：加密货币交易存在亏损风险。",
+      "confirm": "✅ 确认执行",
+      "cancel": "❌ 取消"
+    },
+    "post_execution_report": {
+      "title": "✅ 交易已执行",
+      "body": "交易签名: {signature}\n状态: {status}\n成交价格: {price} {pair}\n实际收到: {received} {token}\n\n[在 Solscan 查看]({url})"
+    },
+    "risk_circuit_breaker": {
+      "title": "⛔ 交易被风险控制拦截",
+      "body": "原因: {reason}\n过去 24h 交易量: ${current_volume}\n尝试交易量: ${attempted_volume}\n\n请在完成身份验证后联系客服提高额度。"
+    },
+    "onboarding": {
+      "disclosure": "📢 风险披露\n\n数字资产交易涉及重大风险。价格波动剧烈。请仅使用您能承受损失的资金进行交易。",
+      "accept": "我已理解并接受风险"
+    }
+  }
+}

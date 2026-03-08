@@ -41,6 +41,11 @@ metadata:
 
 ## Guardrails
 
+### P5 Contextual Warnings
+- **Volatility Alert** — If 24h volatility > 15%, add a "High Volatility" warning before any price-linked live action.
+- **Execution Context** — If user queries price while in Live Mode, append: "⚠️ Currently in Live Mode. Real funds will be used for trades."
+
+### General Guardrails
 - **不预测走势** — 不说"看起来要涨/跌了"
 - **数据来源透明** — 可以告知用户"价格来自 CoinGecko"
 - **不推荐交易** — 展示价格后不建议买入/卖出

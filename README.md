@@ -278,6 +278,39 @@ OpenClaw injects these into the LLM context. The LLM reads the **Workflow** to d
 - [x] Token expansion (Jupiter Price API)
 - [x] Execution mode evaluation (signature/custody/compliance feasibility report)
 
+### P5 — Live Execution (Simulation → Mainnet) 🚧 ARCHITECTURE REFACTOR REQUIRED
+
+> ⚠️ **WARNING**: P5 is a paradigm shift from "simulation" to "real funds on-chain". Do NOT implement directly on current architecture. See [Feasibility Analysis](.claude/plan/p5-p7-feasibility-analysis.md).
+>
+> **Required pre-requisites before mainnet:**
+> 1. **Execution Kernel** - Order state machine (CREATED→RISK_CHECK→SIGNING→BROADCAST→CONFIRMED)
+> 2. **Database Migration** - SQLite → PostgreSQL for concurrent transaction handling
+> 3. **Signer Service** - MPC/HSM integration (Turnkey/Fireblocks recommended)
+> 4. **Risk Control Layer** - Hard-coded limits, circuit breakers, idempotency keys
+> 5. **Audit Trail** - Immutable transaction logs with signatures and fill prices
+> 6. **Compliance Docs** - Risk disclosure, ToS, jurisdiction policies
+
+- [ ] Signer service (MPC/HSM - Turnkey/Fireblocks/AWS Nitro Enclaves)
+- [ ] Jupiter Swap integration (quote → swap → sign → broadcast)
+- [ ] Transaction lifecycle management (send → confirm → retry → report)
+- [ ] Risk controls (per-tx caps, daily limits, slippage circuit-breakers, idempotency)
+- [ ] Balance pre-checks (sufficient SOL + SPL + gas before execution)
+- [ ] Execution audit trail (tx signature, actual fill price, status log)
+- [ ] Compliance documentation (risk disclosure, terms of service, jurisdiction policy)
+- [ ] Phased rollout (whitelist → low-limit $100/tx → general availability)
+
+### P6 — DeFi Ecosystem Integration
+- [ ] Jupiter LP operations (add / remove liquidity)
+- [ ] Lending protocol integration (Solend / MarginFi)
+- [ ] Yield farming automation (Raydium / Orca)
+- [ ] Token launch detection (Pump.fun / Moonshot)
+
+### P7 — Social & Institutional
+- [ ] Strategy marketplace (publish / subscribe / revenue share)
+- [ ] Copy trading (real-time position mirroring)
+- [ ] Multi-signature wallet support (Squads Protocol)
+- [ ] Compliance reporting (per-jurisdiction tax & audit exports)
+
 ## License
 
 MIT
@@ -454,6 +487,39 @@ nano .env   # 填入 HELIUS_API_KEY
 - [x] 鲸鱼追踪（大额转账监控）
 - [x] Token 扩展（Jupiter Price API）
 - [x] 执行模式评估（签名/托管/合规可行性报告）
+
+### P5 — 真实执行（模拟 → 主网）🚧 需架构重构
+
+> ⚠️ **警告**：P5 是从"模拟"到"真实资金上链"的范式切换。不可在当前架构上直接硬上主网。详见[可行性分析报告](.claude/plan/p5-p7-feasibility-analysis.md)。
+>
+> **主网上线前必须完成：**
+> 1. **执行内核** - 订单状态机 (CREATED→RISK_CHECK→SIGNING→BROADCAST→CONFIRMED)
+> 2. **数据库迁移** - SQLite → PostgreSQL 以支持并发交易
+> 3. **签名服务** - MPC/HSM 集成 (推荐 Turnkey/Fireblocks)
+> 4. **风控层** - 硬编码限额、熔断机制、幂等键
+> 5. **审计链路** - 不可变交易日志（含签名和成交价）
+> 6. **合规文档** - 风险披露、服务条款、辖区政策
+
+- [ ] 签名器服务（MPC/HSM - Turnkey/Fireblocks/AWS Nitro Enclaves）
+- [ ] Jupiter Swap 集成（报价 → 交换 → 签名 → 广播）
+- [ ] 交易生命周期管理（发送 → 确认 → 重试 → 报告）
+- [ ] 风控层（单笔限额、日限额、滑点熔断、幂等键）
+- [ ] 余额预检查（执行前验证 SOL + SPL + Gas 充足）
+- [ ] 执行审计链路（交易签名、实际成交价、状态日志）
+- [ ] 合规文档（风险披露、服务条款、辖区政策）
+- [ ] 分阶段上线（白名单 → 低限额 $100/笔 → 全量开放）
+
+### P6 — DeFi 生态集成
+- [ ] Jupiter LP 操作（添加/移除流动性）
+- [ ] 借贷协议集成（Solend / MarginFi）
+- [ ] 收益耕作自动化（Raydium / Orca）
+- [ ] 代币发射检测（Pump.fun / Moonshot）
+
+### P7 — 社交与机构化
+- [ ] 策略市场（发布 / 订阅 / 收益分成）
+- [ ] 跟单交易（实时持仓镜像）
+- [ ] 多签钱包支持（Squads Protocol）
+- [ ] 合规报告（按辖区税务与审计导出）
 
 ## 开源协议
 

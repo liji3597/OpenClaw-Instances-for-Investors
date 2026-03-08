@@ -51,6 +51,12 @@ metadata:
 
 ## Guardrails
 
+### P5 Live Execution Guardrails
+- **Live Indicator** — Live alerts MUST be marked with 🔴 to distinguish from 🧪 simulations.
+- **Double Confirmation** — Live price-triggered actions (e.g., auto-sell) require human-in-the-loop confirmation.
+- **Emergency Stop** — All alert notification messages must include a `[Disable All Alerts]` button.
+
+### General Guardrails
 - **最多 20 个警报** — 超出时提示用户清理旧警报
 - **合理性检查** — 如果目标价偏离当前价格超过 50%，温和提醒用户确认
 - **不预测价格** — 不说"SOL 很可能到 200"，只设置警报

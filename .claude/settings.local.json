@@ -28,7 +28,8 @@
       "Bash(git apply:*)",
       "Bash(npm install)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(docs/UX_FLOW.md:*)"
     ]
   }
 }
