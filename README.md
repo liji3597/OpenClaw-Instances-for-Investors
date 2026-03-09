@@ -58,11 +58,26 @@ User (Telegram) → OpenClaw (LLM) → Our Skills → Solana blockchain
 │   ├── tracker.js                      # Portfolio valuation engine
 │   ├── formatter.js                    # Bilingual output formatting (中文/EN)
 │   ├── script-utils.js                 # Parameter validation utilities
-│   └── services/                       # Service layer (authorization + business logic)
+│   ├── services/                       # Service layer (authorization + business logic)
+│   │   ├── index.js                    # Aggregated exports
+│   │   ├── user-context.js             # User context & wallet operations
+│   │   ├── strategy-service.js         # DCA strategy CRUD with ownership checks
+│   │   └── alert-service.js            # Alert CRUD with scope separation
+│   └── execution-kernel/               # P5: Live execution kernel (Beta)
 │       ├── index.js                    # Aggregated exports
-│       ├── user-context.js             # User context & wallet operations
-│       ├── strategy-service.js         # DCA strategy CRUD with ownership checks
-│       └── alert-service.js            # Alert CRUD with scope separation
+│       ├── types.js                    # Order states, transitions, constants
+│       ├── order-state-machine.js      # Idempotent state transitions
+│       ├── order-store.js              # Order persistence + daily notional tracking
+│       ├── risk-controller.js          # Risk evaluation with whitelist/compliance/manual review
+│       ├── whitelist-service.js        # Beta access control (10-user limit)
+│       ├── circuit-breaker.js          # Global/user circuit breaker with auto-recovery
+│       ├── compliance-service.js       # Geo-blocking & KYC validation
+│       ├── manual-review-service.js    # High-value transaction HITL workflow
+│       ├── rollback-service.js         # State recovery & fund tracking
+│       ├── audit-logger.js             # Hash-chained immutable audit logs
+│       └── migrations/                 # PostgreSQL migration scripts
+│           └── postgres/
+│               └── 0001_execution_kernel_core.up.sql
 └── skills/                             # OpenClaw Skills (prompt-centric)
     ├── solana-investor/                # 🦅 Orchestrator + monitoring utility scripts
     │   └── SKILL.md
@@ -144,6 +159,17 @@ Open Telegram and chat with your OpenClaw bot:
 | `DATABASE_PATH` | Optional | SQLite database path (default: `./data/openclaw.db`) |
 | `TELEGRAM_BOT_TOKEN` | Required for push notifications | Telegram bot token for alert/DCA delivery |
 | `LOG_LEVEL` | Optional | Logger level: `DEBUG`, `INFO`, `WARN`, `ERROR` (default: `INFO`) |
+| **Execution Kernel (P5)** |||
+| `TURNKEY_API_PUBLIC_KEY` | Beta | Turnkey MPC API public key for signing |
+| `TURNKEY_API_PRIVATE_KEY` | Beta | Turnkey MPC API private key for signing |
+| `TURNKEY_ORGANIZATION_ID` | Beta | Turnkey organization ID |
+| `JUPITER_API_KEY` | Beta | Jupiter Swap API key (optional, increases rate limits) |
+| `BLOCKED_JURISDICTIONS` | Beta | Comma-separated ISO country codes blocked (default: `US,CN`) |
+| `ALLOWED_KYC_STATUSES` | Beta | Comma-separated allowed KYC statuses (default: `VERIFIED`) |
+| `BETA_WHITELIST_USER_IDS` | Beta | Comma-separated Telegram user IDs for Beta access |
+| `MANUAL_REVIEW_USD_THRESHOLD` | Beta | Manual review threshold in USD (default: 50) |
+| `CIRCUIT_BREAKER_ENABLED` | Beta | Enable circuit breaker (default: `true`) |
+| `GLOBAL_AUTO_RESUME_MS` | Beta | Global circuit breaker auto-resume delay (default: 300000) |
 
 ## How It Works
 
@@ -230,7 +256,8 @@ OpenClaw injects these into the LLM context. The LLM reads the **Workflow** to d
 ## Security
 
 - **Non-custodial** — Skills never access or store private keys
-- **Read-only** — Only reads public on-chain balances
+- **Read-only** — Only reads public on-chain balances (P0-P4)
+- **MPC Signer** — Turnkey SDK integration for live execution (P5), private keys never touch our servers
 - **0 vulnerabilities** — Removed `@solana/spl-token` transitive dependency (CVE-2025-3194 bigint-buffer)
 - **System-authorized calls** — Sensitive scripts require `--system` flag or `OPENCLAW_SYSTEM=true`
 - **Structured error handling** — Scripts return `MISSING_PARAMS` JSON instead of raw errors
@@ -238,6 +265,8 @@ OpenClaw injects these into the LLM context. The LLM reads the **Workflow** to d
 - **Local database** — SQLite stored on your server, not exposed externally
 - **RugCheck risk feed** — Price flow supports score/warnings/top-holder risk data
 - **Operational observability** — Structured JSON logs and 24h metrics summary
+- **Execution Kernel** — Hard-coded safety limits, circuit breakers, manual review workflow
+- **Compliance** — Geo-blocking, KYC validation, immutable audit logs. See [docs/COMPLIANCE.md](docs/COMPLIANCE.md)
 
 ## Roadmap
 
@@ -278,26 +307,56 @@ OpenClaw injects these into the LLM context. The LLM reads the **Workflow** to d
 - [x] Token expansion (Jupiter Price API)
 - [x] Execution mode evaluation (signature/custody/compliance feasibility report)
 
-### P5 — Live Execution (Simulation → Mainnet) 🚧 ARCHITECTURE REFACTOR REQUIRED
+### P5 — Execution Kernel (Beta) ✅
 
-> ⚠️ **WARNING**: P5 is a paradigm shift from "simulation" to "real funds on-chain". Do NOT implement directly on current architecture. See [Feasibility Analysis](.claude/plan/p5-p7-feasibility-analysis.md).
+> **Status**: Core architecture implemented. Ready for 10-user closed Beta.
 >
-> **Required pre-requisites before mainnet:**
-> 1. **Execution Kernel** - Order state machine (CREATED→RISK_CHECK→SIGNING→BROADCAST→CONFIRMED)
-> 2. **Database Migration** - SQLite → PostgreSQL for concurrent transaction handling
-> 3. **Signer Service** - MPC/HSM integration (Turnkey/Fireblocks recommended)
-> 4. **Risk Control Layer** - Hard-coded limits, circuit breakers, idempotency keys
-> 5. **Audit Trail** - Immutable transaction logs with signatures and fill prices
-> 6. **Compliance Docs** - Risk disclosure, ToS, jurisdiction policies
+> **Safety Limits** (hard-coded, not configurable):
+> - Per-transaction: $100 USD cap
+> - Daily limit: $500 USD per user
+> - Slippage: 3% maximum
+> - Manual review: $50+ requires approval
 
-- [ ] Signer service (MPC/HSM - Turnkey/Fireblocks/AWS Nitro Enclaves)
-- [ ] Jupiter Swap integration (quote → swap → sign → broadcast)
-- [ ] Transaction lifecycle management (send → confirm → retry → report)
-- [ ] Risk controls (per-tx caps, daily limits, slippage circuit-breakers, idempotency)
-- [ ] Balance pre-checks (sufficient SOL + SPL + gas before execution)
-- [ ] Execution audit trail (tx signature, actual fill price, status log)
-- [ ] Compliance documentation (risk disclosure, terms of service, jurisdiction policy)
-- [ ] Phased rollout (whitelist → low-limit $100/tx → general availability)
+- [x] **Execution Kernel** - Order state machine with idempotent transitions
+- [x] **Signer Service** - MPC integration (Turnkey SDK ready)
+- [x] **Jupiter Execution** - Quote → Build → Sign → Broadcast → Confirm
+- [x] **Risk Controller** - Hard-coded limits, idempotency, fingerprinting
+- [x] **Whitelist Service** - 10-user Beta access control
+- [x] **Circuit Breaker** - Global/user pause with auto-recovery
+- [x] **Compliance Service** - Geo-blocking (US/CN), KYC validation
+- [x] **Manual Review** - High-value transaction workflow (HITL)
+- [x] **Rollback Service** - State recovery, fund tracking
+- [x] **Audit Logger** - Hash-chained immutable logs
+- [x] **PostgreSQL Migration** - Production-ready schema
+
+**Architecture**:
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Order State Machine                                        │
+│  CREATED → RISK_CHECK → REVIEW_PENDING? → SIGNING          │
+│                                              ↓              │
+│  FAILED ← CONFIRMED ← BROADCAST ← SIGNING                  │
+└─────────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Risk Controls (pre-execution)                              │
+│  • Idempotency check (fingerprint-based dedup)             │
+│  • Whitelist (Beta 10-user limit)                          │
+│  • Circuit breaker (global/user pause)                     │
+│  • Compliance (geo/KYC)                                    │
+│  • Manual review ($50+ threshold)                          │
+│  • Per-tx cap ($100) / Daily cap ($500)                    │
+│  • Slippage limit (300 bps)                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Security Model**:
+- **MPC Signer**: Turnkey SDK integration — private keys never touch our servers
+- **Human-in-the-Loop**: All trades require explicit user confirmation
+- **Defense in Depth**: Multiple independent safety checks before any fund movement
+- **Immutable Audit**: SHA-256 hash-chained logs for regulatory compliance
+
+See [docs/COMPLIANCE.md](docs/COMPLIANCE.md) for risk disclosure and operational procedures.
 
 ### P6 — DeFi Ecosystem Integration
 - [ ] Jupiter LP operations (add / remove liquidity)
@@ -436,11 +495,23 @@ nano .env   # 填入 HELIUS_API_KEY
 | `DATABASE_PATH` | 可选 | SQLite 数据库路径 |
 | `TELEGRAM_BOT_TOKEN` | 推送通知必填 | Telegram Bot Token，用于警报与定投执行通知 |
 | `LOG_LEVEL` | 可选 | 日志级别：`DEBUG`、`INFO`、`WARN`、`ERROR`（默认 `INFO`） |
+| **执行内核 (P5)** |||
+| `TURNKEY_API_PUBLIC_KEY` | 内测 | Turnkey MPC API 公钥（签名用） |
+| `TURNKEY_API_PRIVATE_KEY` | 内测 | Turnkey MPC API 私钥（签名用） |
+| `TURNKEY_ORGANIZATION_ID` | 内测 | Turnkey 组织 ID |
+| `JUPITER_API_KEY` | 内测 | Jupiter 交换 API 密钥（可选，提升限流） |
+| `BLOCKED_JURISDICTIONS` | 内测 | 封锁的 ISO 国家代码，逗号分隔（默认：`US,CN`） |
+| `ALLOWED_KYC_STATUSES` | 内测 | 允许的 KYC 状态，逗号分隔（默认：`VERIFIED`） |
+| `BETA_WHITELIST_USER_IDS` | 内测 | Beta 白名单 Telegram 用户 ID，逗号分隔 |
+| `MANUAL_REVIEW_USD_THRESHOLD` | 内测 | 人工审核阈值 USD（默认：50） |
+| `CIRCUIT_BREAKER_ENABLED` | 内测 | 启用熔断器（默认：`true`） |
+| `GLOBAL_AUTO_RESUME_MS` | 内测 | 全局熔断器自动恢复延迟（默认：300000） |
 
 ## 安全说明
 
 - **非托管** — 技能绝不访问或存储私钥
-- **只读** — 只读取链上公开余额数据
+- **只读** — 只读取链上公开余额数据（P0-P4）
+- **MPC 签名器** — Turnkey SDK 集成实现真实执行（P5），私钥永不触碰服务器
 - **0 漏洞** — 已移除 `@solana/spl-token` 依赖链（CVE-2025-3194 bigint-buffer 缓冲区溢出）
 - **系统授权** — 敏感脚本需要 `--system` 标志或 `OPENCLAW_SYSTEM=true`
 - **结构化错误** — 脚本返回 `MISSING_PARAMS` JSON，不暴露原始错误
@@ -448,6 +519,8 @@ nano .env   # 填入 HELIUS_API_KEY
 - **本地数据库** — SQLite 存储在你的服务器上
 - **RugCheck 风险源** — 价格链路可返回风险评分、警告和持仓集中度
 - **可观测性** — 结构化 JSON 日志 + 24 小时指标汇总
+- **执行内核** — 硬编码安全限额、熔断器、人工审核流程
+- **合规性** — 地理封锁、KYC 验证、不可变审计日志。详见 [docs/COMPLIANCE.md](docs/COMPLIANCE.md)
 
 ## 路线图
 
@@ -488,26 +561,56 @@ nano .env   # 填入 HELIUS_API_KEY
 - [x] Token 扩展（Jupiter Price API）
 - [x] 执行模式评估（签名/托管/合规可行性报告）
 
-### P5 — 真实执行（模拟 → 主网）🚧 需架构重构
+### P5 — 执行内核 (Beta) ✅
 
-> ⚠️ **警告**：P5 是从"模拟"到"真实资金上链"的范式切换。不可在当前架构上直接硬上主网。详见[可行性分析报告](.claude/plan/p5-p7-feasibility-analysis.md)。
+> **状态**: 核心架构已完成。准备 10 人内测。
 >
-> **主网上线前必须完成：**
-> 1. **执行内核** - 订单状态机 (CREATED→RISK_CHECK→SIGNING→BROADCAST→CONFIRMED)
-> 2. **数据库迁移** - SQLite → PostgreSQL 以支持并发交易
-> 3. **签名服务** - MPC/HSM 集成 (推荐 Turnkey/Fireblocks)
-> 4. **风控层** - 硬编码限额、熔断机制、幂等键
-> 5. **审计链路** - 不可变交易日志（含签名和成交价）
-> 6. **合规文档** - 风险披露、服务条款、辖区政策
+> **安全限额**（硬编码，不可配置）：
+> - 单笔交易：$100 USD 上限
+> - 每日限额：每用户 $500 USD
+> - 滑点上限：3%
+> - 人工审核：$50+ 需审批
 
-- [ ] 签名器服务（MPC/HSM - Turnkey/Fireblocks/AWS Nitro Enclaves）
-- [ ] Jupiter Swap 集成（报价 → 交换 → 签名 → 广播）
-- [ ] 交易生命周期管理（发送 → 确认 → 重试 → 报告）
-- [ ] 风控层（单笔限额、日限额、滑点熔断、幂等键）
-- [ ] 余额预检查（执行前验证 SOL + SPL + Gas 充足）
-- [ ] 执行审计链路（交易签名、实际成交价、状态日志）
-- [ ] 合规文档（风险披露、服务条款、辖区政策）
-- [ ] 分阶段上线（白名单 → 低限额 $100/笔 → 全量开放）
+- [x] **执行内核** - 带幂等状态转换的订单状态机
+- [x] **签名服务** - MPC 集成（Turnkey SDK 就绪）
+- [x] **Jupiter 执行** - 报价 → 构建 → 签名 → 广播 → 确认
+- [x] **风控控制器** - 硬编码限额、幂等校验、指纹去重
+- [x] **白名单服务** - 10 人 Beta 访问控制
+- [x] **熔断器** - 全局/用户级暂停与自动恢复
+- [x] **合规服务** - 地理封锁（US/CN）、KYC 验证
+- [x] **人工审核** - 高价值交易人工审批流程（HITL）
+- [x] **回滚服务** - 状态恢复、资金追踪
+- [x] **审计日志** - 哈希链式不可变日志
+- [x] **PostgreSQL 迁移** - 生产级数据库结构
+
+**架构**：
+```
+┌─────────────────────────────────────────────────────────────┐
+│  订单状态机                                                  │
+│  创建 → 风控检查 → 待审核? → 签名中                          │
+│                              ↓                              │
+│  失败 ← 已确认 ← 已广播 ← 签名中                             │
+└─────────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│  风控检查（执行前）                                          │
+│  • 幂等校验（指纹去重）                                      │
+│  • 白名单（Beta 10人限制）                                   │
+│  • 熔断器（全局/用户暂停）                                   │
+│  • 合规检查（地理/KYC）                                      │
+│  • 人工审核（$50+ 阈值）                                     │
+│  • 单笔限额（$100）/ 日限额（$500）                          │
+│  • 滑点限制（300 基点）                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**安全模型**：
+- **MPC 签名器**: Turnkey SDK 集成 —— 私钥永不触碰我们的服务器
+- **人工介入**: 所有交易需用户明确确认
+- **纵深防御**: 多重独立安全检查后才可移动资金
+- **不可变审计**: SHA-256 哈希链日志，满足合规要求
+
+详见 [docs/COMPLIANCE.md](docs/COMPLIANCE.md) 了解风险披露与操作流程。
 
 ### P6 — DeFi 生态集成
 - [ ] Jupiter LP 操作（添加/移除流动性）
