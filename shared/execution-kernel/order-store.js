@@ -12,6 +12,7 @@ const {
 const DEFAULT_DAILY_NOTIONAL_STATES = Object.freeze([
     ORDER_STATES.CREATED,
     ORDER_STATES.RISK_CHECK,
+    ORDER_STATES.REVIEW_PENDING,
     ORDER_STATES.SIGNING,
     ORDER_STATES.BROADCAST,
     ORDER_STATES.CONFIRMED,
@@ -55,7 +56,7 @@ class OrderStore {
                 signer_provider TEXT,
                 signed_payload_ref TEXT,
                 tx_signature TEXT,
-                state TEXT NOT NULL CHECK (state IN ('CREATED', 'RISK_CHECK', 'SIGNING', 'BROADCAST', 'CONFIRMED', 'FAILED')),
+                state TEXT NOT NULL CHECK (state IN ('CREATED', 'RISK_CHECK', 'REVIEW_PENDING', 'SIGNING', 'BROADCAST', 'CONFIRMED', 'FAILED')),
                 state_entered_at TEXT NOT NULL,
                 deadline_at TEXT,
                 error_code TEXT,
@@ -493,6 +494,110 @@ class OrderStore {
             idempotencyKey: row.idempotency_key || null,
             createdAt: row.created_at,
         };
+    }
+
+    listOrderTransitions(orderId, options = {}) {
+        this._assertRequiredString(orderId, 'orderId');
+        const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : 200;
+        const rows = this.db.prepare(`
+            SELECT * FROM order_transitions
+            WHERE order_id = ?
+            ORDER BY created_at ASC, id ASC
+            LIMIT ?
+        `).all(orderId, limit);
+        return rows.map((row) => this._fromDbTransition(row));
+    }
+
+    forceSetOrderState(input) {
+        this._assertRequiredString(input?.orderId, 'orderId');
+        this._assertRequiredString(input?.toState, 'toState');
+        this._assertRequiredString(input?.idempotencyKey, 'idempotencyKey');
+
+        if (!Object.values(ORDER_STATES).includes(input.toState)) {
+            const err = new Error(`Invalid state: ${input.toState}`);
+            err.code = 'INVALID_ORDER_STATE';
+            throw err;
+        }
+
+        return this._runInTransaction(() => {
+            const current = this.getOrderById(input.orderId);
+            if (!current) {
+                const err = new Error(`Order not found: ${input.orderId}`);
+                err.code = 'ORDER_NOT_FOUND';
+                throw err;
+            }
+
+            const existingTransitionRow = this.db.prepare(
+                'SELECT * FROM order_transitions WHERE order_id = ? AND idempotency_key = ?'
+            ).get(input.orderId, input.idempotencyKey);
+            if (existingTransitionRow) {
+                return {
+                    applied: false,
+                    idempotent: true,
+                    order: this.getOrderById(input.orderId),
+                    transition: this._fromDbTransition(existingTransitionRow),
+                };
+            }
+
+            const nowIso = this._nowIso();
+
+            this.db.prepare(`
+                UPDATE orders SET
+                    state = ?,
+                    state_entered_at = ?,
+                    deadline_at = ?,
+                    metadata = ?,
+                    updated_at = ?,
+                    version = version + 1,
+                    error_code = ?,
+                    error_message = ?
+                WHERE id = ?
+            `).run(
+                input.toState,
+                nowIso,
+                input.deadlineAt === undefined ? this._computeStateDeadlineIso(input.toState, nowIso) : this._normalizeNullableIso(input.deadlineAt),
+                this._serializeJson(input.metadata || {}),
+                nowIso,
+                this._normalizeNullableString(input.errorCode),
+                this._normalizeNullableString(input.errorMessage),
+                input.orderId
+            );
+
+            const transitionRow = {
+                id: this.idFactory(),
+                order_id: input.orderId,
+                from_state: current.state,
+                to_state: input.toState,
+                reason: this._normalizeNullableString(input.reason || 'rollback_force_state'),
+                idempotency_key: String(input.idempotencyKey),
+                actor: this._normalizeNullableString(input.actor || 'system'),
+                metadata: this._serializeJson(input.transitionMetadata || {}),
+                created_at: nowIso,
+            };
+
+            this.db.prepare(`
+                INSERT INTO order_transitions (
+                    id, order_id, from_state, to_state, reason, idempotency_key, actor, metadata, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+                transitionRow.id,
+                transitionRow.order_id,
+                transitionRow.from_state,
+                transitionRow.to_state,
+                transitionRow.reason,
+                transitionRow.idempotency_key,
+                transitionRow.actor,
+                transitionRow.metadata,
+                transitionRow.created_at
+            );
+
+            return {
+                applied: true,
+                idempotent: false,
+                order: this.getOrderById(input.orderId),
+                transition: this._fromDbTransition(transitionRow),
+            };
+        });
     }
 
     _computeStateDeadlineIso(state, baseIso) {

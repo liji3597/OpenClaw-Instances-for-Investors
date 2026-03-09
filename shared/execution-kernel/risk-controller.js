@@ -15,6 +15,12 @@ const RULE_CODES = Object.freeze({
     IDEMPOTENCY_KEY_INVALID: 'IDEMPOTENCY_KEY_INVALID',
     IDEMPOTENCY_KEY_CONFLICT: 'IDEMPOTENCY_KEY_CONFLICT',
     PER_TX_CAP_EXCEEDED: 'PER_TX_CAP_EXCEEDED',
+    WHITELIST_BLOCKED: 'WHITELIST_BLOCKED',
+    CIRCUIT_BREAKER_GLOBAL: 'CIRCUIT_BREAKER_GLOBAL',
+    CIRCUIT_BREAKER_USER: 'CIRCUIT_BREAKER_USER',
+    COMPLIANCE_BLOCKED: 'COMPLIANCE_BLOCKED',
+    MANUAL_REVIEW_CONTEXT_MISSING: 'MANUAL_REVIEW_CONTEXT_MISSING',
+    MANUAL_REVIEW_REQUIRED: 'MANUAL_REVIEW_REQUIRED',
     DAILY_LIMIT_EXCEEDED: 'DAILY_LIMIT_EXCEEDED',
     SLIPPAGE_CIRCUIT_BREAKER: 'SLIPPAGE_CIRCUIT_BREAKER',
 });
@@ -22,6 +28,7 @@ const RULE_CODES = Object.freeze({
 const DAILY_NOTIONAL_STATES = Object.freeze([
     ORDER_STATES.CREATED,
     ORDER_STATES.RISK_CHECK,
+    ORDER_STATES.REVIEW_PENDING,
     ORDER_STATES.SIGNING,
     ORDER_STATES.BROADCAST,
     ORDER_STATES.CONFIRMED,
@@ -40,6 +47,13 @@ class RiskController {
             ...DEFAULT_LIMITS,
             ...(options.limits || {}),
         };
+        this.whitelistService = options.whitelistService || null;
+        this.circuitBreaker = options.circuitBreaker || null;
+        this.complianceService = options.complianceService || null;
+        this.manualReviewService = options.manualReviewService || null;
+        this.manualReviewUsdThreshold = Number.isFinite(Number(options.manualReviewUsdThreshold))
+            ? Number(options.manualReviewUsdThreshold)
+            : 1_000;
         this.logger = createLogger('execution-risk-controller');
     }
 
@@ -71,8 +85,18 @@ class RiskController {
                 limits: { ...this.limits },
                 idempotencyFingerprint: normalized.idempotencyFingerprint,
                 existingOrder: idemCheck.existingOrder || null,
+                manualReview: null,
             };
         }
+
+        const whitelistViolation = this._evaluateWhitelist(normalized);
+        if (whitelistViolation) violations.push(whitelistViolation);
+
+        const circuitViolation = this._evaluateCircuitBreaker(normalized);
+        if (circuitViolation) violations.push(circuitViolation);
+
+        const complianceViolations = this._evaluateCompliance(normalized);
+        if (complianceViolations.length > 0) violations.push(...complianceViolations);
 
         if (normalized.usdNotional > this.limits.perTxUsdCap) {
             violations.push(this._violation(
@@ -119,12 +143,49 @@ class RiskController {
             ));
         }
 
+        let manualReview = null;
+        const existingReview = this._getExistingManualReview(normalized);
+        if (this._isManualReviewRequired(normalized, existingReview)) {
+            if (!normalized.orderId) {
+                violations.push(this._violation(
+                    RULE_CODES.MANUAL_REVIEW_CONTEXT_MISSING,
+                    'Manual review requires orderId context before risk evaluation.',
+                    'HIGH',
+                    {
+                        thresholdUsd: this.manualReviewUsdThreshold,
+                        requestedUsd: normalized.usdNotional,
+                        orderId: normalized.orderId,
+                    }
+                ));
+            } else {
+                manualReview = existingReview || this._openManualReview(normalized, idemCheck.existingOrder);
+                violations.push(this._violation(
+                    RULE_CODES.MANUAL_REVIEW_REQUIRED,
+                    `Manual review required: ${normalized.usdNotional} >= ${this.manualReviewUsdThreshold}`,
+                    'MEDIUM',
+                    {
+                        thresholdUsd: this.manualReviewUsdThreshold,
+                        requestedUsd: normalized.usdNotional,
+                        reviewId: manualReview?.id || null,
+                        reviewStatus: manualReview?.status || null,
+                    }
+                ));
+            }
+        } else if (existingReview) {
+            manualReview = existingReview;
+        }
+
+        const shouldPersistViolations = violations.filter((v) => v.ruleCode !== RULE_CODES.MANUAL_REVIEW_REQUIRED);
+        const persistList = shouldPersistViolations.length > 0
+            ? shouldPersistViolations
+            : violations;
+
         if (violations.length > 0 && persistViolations) {
             this._persistViolations({
                 orderId: normalized.orderId || idemCheck.existingOrder?.id || null,
                 userId: normalized.userId,
                 idempotencyKey: normalized.idempotencyKey,
-                violations,
+                violations: persistList,
             });
         }
 
@@ -137,6 +198,7 @@ class RiskController {
             limits: { ...this.limits },
             idempotencyFingerprint: normalized.idempotencyFingerprint,
             existingOrder: idemCheck.existingOrder || null,
+            manualReview,
         };
 
         this._appendAudit('RISK_EVALUATED', result, {
@@ -272,6 +334,8 @@ class RiskController {
             clientOrderId: intent.clientOrderId ? String(intent.clientOrderId) : null,
             referenceDate,
             metadata: intent.metadata && typeof intent.metadata === 'object' ? intent.metadata : {},
+            countryCode: this._toNullableUpper(intent.countryCode || intent.metadata?.countryCode),
+            kycStatus: this._toNullableUpper(intent.kycStatus || intent.metadata?.kycStatus),
         };
 
         normalized.idempotencyFingerprint = this._fingerprint({
@@ -285,6 +349,11 @@ class RiskController {
         });
 
         return normalized;
+    }
+
+    _toNullableUpper(value) {
+        if (value === undefined || value === null || value === '') return null;
+        return String(value).trim().toUpperCase();
     }
 
     _intentShapeFromOrder(order) {
@@ -344,6 +413,187 @@ class RiskController {
         }
     }
 }
+
+    _evaluateWhitelist(intent) {
+        if (!this.whitelistService || typeof this.whitelistService.checkAccess !== 'function') return null;
+
+        try {
+            const decision = this.whitelistService.checkAccess(intent.userId);
+            if (decision?.allowed) return null;
+            return this._violation(
+                RULE_CODES.WHITELIST_BLOCKED,
+                decision?.message || 'User is not in whitelist.',
+                'HIGH',
+                {
+                    userId: intent.userId,
+                    code: decision?.code || 'WHITELIST_BLOCKED',
+                    whitelistEnabled: decision?.whitelistEnabled !== false,
+                    whitelistSize: decision?.whitelistSize,
+                    whitelistCap: decision?.whitelistCap,
+                }
+            );
+        } catch (err) {
+            this.logger.warn('Whitelist evaluation failed', {
+                userId: intent.userId,
+                reason: err.message,
+            });
+            return this._violation(
+                RULE_CODES.WHITELIST_BLOCKED,
+                'Whitelist service evaluation failed.',
+                'HIGH',
+                { reason: err.message }
+            );
+        }
+    }
+
+    _evaluateCircuitBreaker(intent) {
+        if (!this.circuitBreaker || typeof this.circuitBreaker.evaluate !== 'function') return null;
+
+        try {
+            const decision = this.circuitBreaker.evaluate(intent.userId, { now: this.clock() });
+            if (decision?.allowed) return null;
+            const ruleCode = decision?.scope === 'global'
+                ? RULE_CODES.CIRCUIT_BREAKER_GLOBAL
+                : RULE_CODES.CIRCUIT_BREAKER_USER;
+            return this._violation(
+                ruleCode,
+                decision?.message || 'Execution paused by circuit breaker.',
+                'HIGH',
+                {
+                    scope: decision?.scope || 'unknown',
+                    resumeAt: decision?.resumeAt || null,
+                    reason: decision?.reason || null,
+                }
+            );
+        } catch (err) {
+            this.logger.warn('Circuit breaker evaluation failed', {
+                userId: intent.userId,
+                reason: err.message,
+            });
+            return this._violation(
+                RULE_CODES.CIRCUIT_BREAKER_GLOBAL,
+                'Circuit breaker service evaluation failed.',
+                'HIGH',
+                { reason: err.message }
+            );
+        }
+    }
+
+    _evaluateCompliance(intent) {
+        if (!this.complianceService || typeof this.complianceService.evaluate !== 'function') return [];
+
+        try {
+            const decision = this.complianceService.evaluate({
+                userId: intent.userId,
+                countryCode: intent.countryCode,
+                kycStatus: intent.kycStatus,
+                metadata: intent.metadata,
+            });
+            if (decision?.allowed) return [];
+
+            const rawViolations = Array.isArray(decision?.violations) ? decision.violations : [];
+            if (rawViolations.length === 0) {
+                return [this._violation(
+                    RULE_CODES.COMPLIANCE_BLOCKED,
+                    'Compliance policy blocked this order.',
+                    'HIGH',
+                    {
+                        countryCode: decision?.countryCode || null,
+                        kycStatus: decision?.kycStatus || null,
+                    }
+                )];
+            }
+
+            return rawViolations.map((item) => this._violation(
+                item.ruleCode || RULE_CODES.COMPLIANCE_BLOCKED,
+                item.message || 'Compliance policy blocked this order.',
+                item.severity || 'HIGH',
+                item.metadata || {}
+            ));
+        } catch (err) {
+            this.logger.warn('Compliance evaluation failed', {
+                userId: intent.userId,
+                reason: err.message,
+            });
+            return [this._violation(
+                RULE_CODES.COMPLIANCE_BLOCKED,
+                'Compliance service evaluation failed.',
+                'HIGH',
+                { reason: err.message }
+            )];
+        }
+    }
+
+    _getExistingManualReview(intent) {
+        if (!this.manualReviewService) return null;
+        if (!intent.orderId) return null;
+        if (typeof this.manualReviewService.getReviewByOrderId !== 'function') return null;
+        try {
+            return this.manualReviewService.getReviewByOrderId(intent.orderId);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    _isManualReviewRequired(intent, existingReview = null) {
+        if (existingReview) {
+            if (existingReview.status === 'APPROVED') return false;
+            if (existingReview.status === 'REJECTED') return false;
+            if (existingReview.status === 'CREATED' || existingReview.status === 'PENDING_REVIEW') return true;
+        }
+
+        if (
+            this.manualReviewService
+            && typeof this.manualReviewService.requiresManualReview === 'function'
+        ) {
+            return this.manualReviewService.requiresManualReview(intent);
+        }
+
+        // Fallback threshold mode.
+        return Number(intent.usdNotional) >= this.manualReviewUsdThreshold;
+    }
+
+    _openManualReview(intent, existingOrder) {
+        if (!this.manualReviewService || !intent.orderId) return null;
+        if (typeof this.manualReviewService.createReviewRequest !== 'function') return null;
+
+        try {
+            const existing = typeof this.manualReviewService.getReviewByOrderId === 'function'
+                ? this.manualReviewService.getReviewByOrderId(intent.orderId)
+                : null;
+            if (existing) return existing;
+
+            const created = this.manualReviewService.createReviewRequest({
+                orderId: intent.orderId,
+                userId: intent.userId || existingOrder?.userId,
+                usdNotional: intent.usdNotional,
+                reason: 'high_value_transaction',
+                metadata: {
+                    requestedUsd: intent.usdNotional,
+                    thresholdUsd: this.manualReviewUsdThreshold,
+                    idempotencyKey: intent.idempotencyKey,
+                },
+            });
+            if (typeof this.manualReviewService.submitForReview === 'function') {
+                return this.manualReviewService.submitForReview(created.id, {
+                    actor: 'risk-controller',
+                    reason: 'high_value_transaction',
+                });
+            }
+            return created;
+        } catch (err) {
+            this.logger.warn('Manual review request failed', {
+                orderId: intent.orderId,
+                userId: intent.userId,
+                reason: err.message,
+            });
+            return null;
+        }
+    }
+
+    _hasBlockingViolation(violations) {
+        return violations.some((v) => v.severity === 'HIGH');
+    }
 
 function stableStringify(value) {
     return JSON.stringify(normalizeForStable(value));
